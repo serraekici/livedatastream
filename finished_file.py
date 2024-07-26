@@ -1,46 +1,81 @@
-from itertools import count
-import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+import numpy as np
+import tkinter as tk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-plt.style.use('fivethirtyeight')
+# Simüle edilmiş canlı veri
+def generate_data(num_channels, num_points):
+    return np.random.randn(num_channels, num_points)
 
-x_vals = []
-y_vals = []
+# Canlı veri güncelleme fonksiyonu
+def update_data(num_channels, num_points):
+    new_data = generate_data(num_channels, num_points)
+    return new_data
 
-plt.plot([], [], label='Channel 1')
-plt.plot([], [], label='Channel 2')
- 
-def animate(i):
-    data = pd.read_csv('data.csv')
-    x = data['x_value']
-    y1 = data['total_1']
-    y2 = data['total_2']
+# Grafik oluşturma fonksiyonu
+def create_graphs(data, start_channel, channels_per_graph=2):
+    num_channels, num_points = data.shape
+    fig, axs = plt.subplots(1, channels_per_graph, figsize=(15, 5))
+    
+    for i in range(channels_per_graph):
+        channel_index = start_channel + i * 2  # İkili kanal grupları
+        if channel_index + 1 < num_channels:
+            axs[i].plot(data[channel_index])
+            axs[i].plot(data[channel_index + 1])
+            axs[i].legend()
+        else:
+            axs[i].set_visible(False)
+    
+    return fig, axs
 
-    ax = plt.gca()
-    line1, line2 = ax.lines
+# Slider değiştiğinde grafikleri güncelleyen fonksiyon
+def update_graphs(val):
+    global canvas, fig, axs, data
+    start_channel = int(val) * channels_per_graph * 2  # İkili kanal grupları
 
-    line1.set_data(x, y1)
-    line2.set_data(x, y2)
+    for i in range(channels_per_graph):
+        channel_index = start_channel + i * 2
+        axs[i].cla()  # Sadece eksenleri temizle
+        if channel_index + 1 < num_channels:
+            axs[i].plot(data[channel_index])
+            axs[i].plot(data[channel_index + 1])
+            axs[i].legend()
+        else:
+            axs[i].set_visible(False)
+    
+    canvas.draw()
 
-    xlim_low, xlim_high = ax.get_xlim()
-    ylim_low, ylim_high = ax.get_ylim()
+# Her saniye verileri güncelleyen fonksiyon
+def update_data_continuously():
+    global data
+    data = update_data(num_channels, num_points)
+    update_graphs(slider.get())
+    root.after(1000, update_data_continuously)
 
-    ax.set_xlim(xlim_low, (x.max() + 5))
+# Parametreler
+num_channels = 20
+num_points = 100
+channels_per_graph = 2
 
-    y1max = y1.max()
-    y2max = y2.max()
-    current_ymax = y1max if (y1max > y2max) else y2max
+# Başlangıç verisi
+data = generate_data(num_channels, num_points)
+fig, axs = create_graphs(data, 0, channels_per_graph)
 
-    y1min = y1.min()
-    y2min = y2.min()
-    current_ymin = y1min if (y1min < y2min) else y2min
+# Tkinter penceresi oluşturma
+root = tk.Tk()
+root.title("Live Data Plotter")
 
-    ax.set_ylim((current_ymin - 5), (current_ymax + 5))
+# Matplotlib figürünü Tkinter penceresine ekleme
+canvas = FigureCanvasTkAgg(fig, master=root)
+canvas.draw()
+canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
+# Slider oluşturma
+slider = tk.Scale(root, from_=0, to=(num_channels // (channels_per_graph * 2)) - 1, orient=tk.HORIZONTAL, command=update_graphs)
+slider.pack(side=tk.BOTTOM, fill=tk.X)
 
-ani = FuncAnimation(plt.gcf(), animate, interval=1000)
+# Canlı veri güncellemeyi başlatma
+root.after(1000, update_data_continuously)
 
-plt.legend()
-plt.tight_layout()
-plt.show()
+# Tkinter main loop
+root.mainloop()
