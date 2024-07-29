@@ -1,0 +1,29 @@
+import wx
+
+class MyApp(wx.App):
+    def OnInit(self):
+        frame = wx.Frame(None, title="Basit GUI Örneği")
+        panel = wx.Panel(frame)
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        self.label = wx.StaticText(panel, label="Hoşgeldiniz!")
+        sizer.Add(self.label, 0, wx.ALL, 10)
+
+        self.entry = wx.TextCtrl(panel)
+        sizer.Add(self.entry, 0, wx.ALL, 10)
+
+        button = wx.Button(panel, label="Tıkla")
+        button.Bind(wx.EVT_BUTTON, self.on_button_click)
+        sizer.Add(button, 0, wx.ALL, 10)
+
+        panel.SetSizer(sizer)
+        frame.Show()
+        return True
+
+    def on_button_click(self, event):
+        self.label.SetLabel("Merhaba, " + self.entry.GetValue())
+
+if __name__ == '__main__':
+    app = MyApp()
+    app.MainLoop()
