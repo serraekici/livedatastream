@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import simpledialog, messagebox
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -12,7 +12,7 @@ def generate_data(num_channels, num_points):
 def update_data(num_channels, num_points):
     return generate_data(num_channels, num_points)
 
-def create_graphs(data, start_channel, channels_per_graph=1, layout='horizontal', compare=False):
+def create_graphs(data, start_channel, channels_per_graph=1, layout='horizontal', compare=False, compare_channels=[]):
     num_channels, num_points = data.shape
 
     if layout == 'horizontal':
@@ -27,10 +27,14 @@ def create_graphs(data, start_channel, channels_per_graph=1, layout='horizontal'
 
     if compare:
         for i in range(channels_per_graph):
-            channel_index = start_channel + i * 2
-            if channel_index + 1 < num_channels:
-                axs[i].plot(data[channel_index], label=f'Channel {channel_index}', marker='o')
-                axs[i].plot(data[channel_index + 1], label=f'Channel {channel_index + 1}', marker='o')
+            if len(compare_channels) > i * 2:
+                channel_index1 = compare_channels[i * 2]
+                if channel_index1 < num_channels:
+                    axs[i].plot(data[channel_index1], label=f'Channel {channel_index1}', marker='o')
+                if len(compare_channels) > i * 2 + 1:
+                    channel_index2 = compare_channels[i * 2 + 1]
+                    if channel_index2 < num_channels:
+                        axs[i].plot(data[channel_index2], label=f'Channel {channel_index2}', marker='o')
                 axs[i].set_facecolor("white")
                 axs[i].legend()
                 axs[i].grid(True)
@@ -51,62 +55,66 @@ def create_graphs(data, start_channel, channels_per_graph=1, layout='horizontal'
     return fig, axs
 
 def update_graphs(val):
-    global canvas, fig, axs, data, num_channels, channels_per_graph, zoom_limits, compare_mode
+    global canvas, fig, axs, data, num_channels, channels_per_graph, zoom_limits, compare_mode, compare_channels
     start_channel = int(val) * channels_per_graph * 2 if compare_mode else int(val) * channels_per_graph
 
     # Verileri güncelle
     for i in range(channels_per_graph):
-        channel_index = start_channel + i * 2 if compare_mode else start_channel + i
         ax = axs[i]
         ax.clear()
-        if channel_index < num_channels:
-            ax.plot(data[channel_index], label=f'Channel {channel_index}', marker='o')
-            if compare_mode and channel_index + 1 < num_channels:
-                ax.plot(data[channel_index + 1], label=f'Channel {channel_index + 1}', marker='o')
+        if compare_mode:
+            if len(compare_channels) > i * 2:
+                channel_index1 = compare_channels[i * 2]
+                if channel_index1 < num_channels:
+                    ax.plot(data[channel_index1], label=f'Channel {channel_index1}', marker='o')
+                if len(compare_channels) > i * 2 + 1:
+                    channel_index2 = compare_channels[i * 2 + 1]
+                    if channel_index2 < num_channels:
+                        ax.plot(data[channel_index2], label=f'Channel {channel_index2}', marker='o')
             ax.set_facecolor("white")
             ax.legend()
             ax.grid(True)
-            if ax in zoom_limits:
-                ax.set_xlim(zoom_limits[ax]['xlim'])
-                ax.set_ylim(zoom_limits[ax]['ylim'])
         else:
-            ax.set_visible(False)  # Kullanılmayan eksenleri gizle
+            channel_index = start_channel + i
+            if channel_index < num_channels:
+                ax.plot(data[channel_index], label=f'Channel {channel_index}', marker='o')
+                ax.set_facecolor("white")
+                ax.legend()
+                ax.grid(True)
+        if ax in zoom_limits:
+            ax.set_xlim(zoom_limits[ax]['xlim'])
+            ax.set_ylim(zoom_limits[ax]['ylim'])
     
     fig.tight_layout()  # Grafikleri düzgün hizalamak için
     canvas.draw()
 
 def update_data_continuously():
     global data, num_channels, num_points
-    # Veri boyutlarını artırarak eski verilerle birleştiriyoruz
     new_data = update_data(num_channels, num_points)
-    data = np.concatenate((data, new_data), axis=1)  # Eski verilerle yeni verileri birleştir
-    num_points_total = data.shape[1]  # Toplam veri noktası sayısı
-    num_pages = (num_points_total - 1) // (channels_per_graph * 2) + 1  # Sayfa sayısını yeniden hesapla
-    pagination_slider.num_pages = num_pages  # Sayfa sayısını güncelle
-    pagination_slider.update_dots()  # Sayfa noktalarını güncelle
+    data = np.concatenate((data, new_data), axis=1)
+    num_points_total = data.shape[1]
+    num_pages = (num_points_total - 1) // (channels_per_graph * 2) + 1
+    pagination_slider.num_pages = num_pages
+    pagination_slider.update_dots()
     update_graphs(pagination_slider.current_page)
     global after_id
-    after_id = root.after(2000, update_data_continuously)  # 2 saniye (2000 milisaniye) gecikme
+    after_id = root.after(2000, update_data_continuously)
 
-def set_graphs_per_screen(value, layout='horizontal', compare=False):
+def set_graphs_per_screen(value, layout='horizontal', compare=False, compare_channels=[]):
     global channels_per_graph, fig, axs, canvas, compare_mode
 
     channels_per_graph = int(value)
-    compare_mode = compare  # Update global compare_mode
+    compare_mode = compare
 
-    # Eski figür ve eksenleri temizle
-    canvas.get_tk_widget().pack_forget()  # Mevcut widget'ı kaldır
-    fig.clf()  # Figürün içeriğini temizle
+    canvas.get_tk_widget().pack_forget()
+    fig.clf()
 
-    # Yeni figür ve eksenleri oluştur
-    fig, axs = create_graphs(data, 0, channels_per_graph, layout=layout, compare=compare_mode)
+    fig, axs = create_graphs(data, 0, channels_per_graph, layout=layout, compare=compare_mode, compare_channels=compare_channels)
 
-    # Canvas'ı yeniden oluştur
     canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
     canvas.draw()
     canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
-    # Zoom özelliklerini etkinleştir
     enable_zoom(canvas)
 
 def update_data_type_label(data_type):
@@ -145,6 +153,37 @@ def enable_zoom(canvas):
 def add_cursor(ax):
     cursor = Cursor(ax, useblit=True, color='red', linewidth=1)
     return cursor
+
+def open_compare_dialog():
+    global compare_channels
+    compare_channels = []
+    dialog = tk.Toplevel(root)
+    dialog.title("Select Channels for Comparison")
+
+    tk.Label(dialog, text="Enter two channels to compare (e.g., 0,1):").pack(pady=10)
+
+    entry = tk.Entry(dialog)
+    entry.pack(pady=5)
+
+    def submit():
+        global compare_channels
+        try:
+            channels = list(map(int, entry.get().split(',')))
+            if len(channels) == 2 and len(set(channels)) == 2:  # Ensure exactly 2 unique channels
+                compare_channels = channels
+                dialog.destroy()
+                set_graphs_per_screen(channels_per_graph, layout='horizontal', compare=True, compare_channels=compare_channels)
+            else:
+                tk.messagebox.showerror("Input Error", "Please enter exactly two unique channels.")
+        except ValueError:
+            tk.messagebox.showerror("Input Error", "Please enter valid integers separated by commas.")
+
+    tk.Button(dialog, text="Submit", command=submit).pack(pady=10)
+
+def disable_compare_mode():
+    global compare_channels
+    compare_channels = []
+    set_graphs_per_screen(channels_per_graph, layout='horizontal', compare=False, compare_channels=compare_channels)
 
 class PaginationSlider(tk.Frame):
     def __init__(self, parent, num_pages, layout='horizontal', *args, **kwargs):
@@ -190,7 +229,8 @@ class PaginationSlider(tk.Frame):
 num_channels = 120
 num_points = 50
 channels_per_graph = 1
-compare_mode = False  # Start with compare mode off
+compare_mode = False
+compare_channels = []
 data = generate_data(num_channels, num_points)
 
 # Create the main window
@@ -201,11 +241,11 @@ root.title("Live Data Stream")
 menu_bar = tk.Menu(root)
 root.config(menu=menu_bar)
 
-# Veri tipinin barı
+# Create a "Data Type" menu
 category_menu = tk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Data Type", menu=category_menu)
 
-# Seçenekleri
+# Add options to the "Data Type" menu
 category_menu.add_command(label="Brain Voltage", command=lambda: update_data_type_label("Brain Voltage"))
 category_menu.add_command(label="Electrolyte", command=lambda: update_data_type_label("Electrolyte"))
 category_menu.add_command(label="ex3", command=lambda: update_data_type_label("ex3"))
@@ -215,22 +255,22 @@ settings_menu = tk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Settings", menu=settings_menu)
 
 # Add options to the "Settings" menu for number of graphs per screen
-settings_menu.add_command(label="1 Graph Horizontal", command=lambda: set_graphs_per_screen(1, 'horizontal', compare_mode))
-settings_menu.add_command(label="2 Graphs Horizontal", command=lambda: set_graphs_per_screen(2, 'horizontal', compare_mode))
-settings_menu.add_command(label="3 Graphs Horizontal", command=lambda: set_graphs_per_screen(3, 'horizontal', compare_mode))
-settings_menu.add_command(label="4 Graphs Horizontal", command=lambda: set_graphs_per_screen(4, 'horizontal', compare_mode))
-settings_menu.add_command(label="1 Graph Vertical", command=lambda: set_graphs_per_screen(1, 'vertical', compare_mode))
-settings_menu.add_command(label="2 Graphs Vertical", command=lambda: set_graphs_per_screen(2, 'vertical', compare_mode))
-settings_menu.add_command(label="3 Graphs Vertical", command=lambda: set_graphs_per_screen(3, 'vertical', compare_mode))
-settings_menu.add_command(label="4 Graphs Vertical", command=lambda: set_graphs_per_screen(4, 'vertical', compare_mode))
+settings_menu.add_command(label="1 Graph Horizontal", command=lambda: set_graphs_per_screen(1, 'horizontal', compare_mode, compare_channels))
+settings_menu.add_command(label="2 Graphs Horizontal", command=lambda: set_graphs_per_screen(2, 'horizontal', compare_mode, compare_channels))
+settings_menu.add_command(label="3 Graphs Horizontal", command=lambda: set_graphs_per_screen(3, 'horizontal', compare_mode, compare_channels))
+settings_menu.add_command(label="4 Graphs Horizontal", command=lambda: set_graphs_per_screen(4, 'horizontal', compare_mode, compare_channels))
+settings_menu.add_command(label="1 Graph Vertical", command=lambda: set_graphs_per_screen(1, 'vertical', compare_mode, compare_channels))
+settings_menu.add_command(label="2 Graphs Vertical", command=lambda: set_graphs_per_screen(2, 'vertical', compare_mode, compare_channels))
+settings_menu.add_command(label="3 Graphs Vertical", command=lambda: set_graphs_per_screen(3, 'vertical', compare_mode, compare_channels))
+settings_menu.add_command(label="4 Graphs Vertical", command=lambda: set_graphs_per_screen(4, 'vertical', compare_mode, compare_channels))
 
 # Create a "Compare" menu
 compare_menu = tk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Compare", menu=compare_menu)
 
-# Add "Compare" option
-compare_menu.add_command(label="Enable Compare Mode", command=lambda: set_graphs_per_screen(channels_per_graph, layout='horizontal', compare=True))
-compare_menu.add_command(label="Disable Compare Mode", command=lambda: set_graphs_per_screen(channels_per_graph, layout='horizontal', compare=False))
+# Add "Compare" options
+compare_menu.add_command(label="Enable Compare Mode", command=open_compare_dialog)
+compare_menu.add_command(label="Disable Compare Mode", command=disable_compare_mode)
 
 # Create a frame for the controls
 control_frame = tk.Frame(root)
@@ -241,7 +281,7 @@ canvas_frame = tk.Frame(root)
 canvas_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
 # Create initial graphs
-fig, axs = create_graphs(data, 0, channels_per_graph, compare=compare_mode)
+fig, axs = create_graphs(data, 0, channels_per_graph, compare=compare_mode, compare_channels=compare_channels)
 
 # Create a canvas to display the graphs
 canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
