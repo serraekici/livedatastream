@@ -26,10 +26,9 @@ def create_graphs(data, start_channel, channels_per_graph=1, layout='horizontal'
         axs = list(axs)  # Çoklu eksen varsa, listeye dönüştür
     
     for i in range(channels_per_graph):
-        channel_index = start_channel + i * 2
-        if channel_index + 1 < num_channels:
+        channel_index = start_channel + i
+        if channel_index < num_channels:
             axs[i].plot(data[channel_index], label=f'Channel {channel_index}', marker='o')
-            axs[i].plot(data[channel_index + 1], label=f'Channel {channel_index + 1}', marker='o')
             axs[i].set_facecolor("white")
             axs[i].legend()
             axs[i].grid(True)
@@ -41,16 +40,15 @@ def create_graphs(data, start_channel, channels_per_graph=1, layout='horizontal'
 
 def update_graphs(val):
     global canvas, fig, axs, data, num_channels, channels_per_graph, zoom_limits
-    start_channel = int(val) * channels_per_graph * 2
+    start_channel = int(val) * channels_per_graph
 
     # Verileri güncelle
     for i in range(channels_per_graph):
-        channel_index = start_channel + i * 2
+        channel_index = start_channel + i
         ax = axs[i]
         ax.clear()
-        if channel_index + 1 < num_channels:
+        if channel_index < num_channels:
             ax.plot(data[channel_index], label=f'Channel {channel_index}', marker='o')
-            ax.plot(data[channel_index + 1], label=f'Channel {channel_index + 1}', marker='o')
             ax.set_facecolor("white")
             ax.legend()
             ax.grid(True)
@@ -69,7 +67,7 @@ def update_data_continuously():
     new_data = update_data(num_channels, num_points)
     data = np.concatenate((data, new_data), axis=1)  # Eski verilerle yeni verileri birleştir
     num_points_total = data.shape[1]  # Toplam veri noktası sayısı
-    num_pages = (num_points_total - 1) // (channels_per_graph * 2) + 1  # Sayfa sayısını yeniden hesapla
+    num_pages = (num_points_total - 1) // channels_per_graph + 1  # Sayfa sayısını yeniden hesapla
     pagination_slider.num_pages = num_pages  # Sayfa sayısını güncelle
     pagination_slider.update_dots()  # Sayfa noktalarını güncelle
     update_graphs(pagination_slider.current_page)
@@ -200,18 +198,27 @@ category_menu.add_command(label="ex3", command=lambda: update_data_type_label("e
 settings_menu = tk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Settings", menu=settings_menu)
 
-# Add options to the "Settings" menu for number of graphs per screen
-settings_menu.add_command(label="1 Graph Horizontal", command=lambda: set_graphs_per_screen(1, 'horizontal'))
-settings_menu.add_command(label="2 Graphs Horizontal", command=lambda: set_graphs_per_screen(2, 'horizontal'))
-settings_menu.add_command(label="3 Graphs Horizontal", command=lambda: set_graphs_per_screen(3, 'horizontal'))
-settings_menu.add_command(label="4 Graphs Horizontal", command=lambda: set_graphs_per_screen(4, 'horizontal'))
-settings_menu.add_command(label="1 Graph Vertical", command=lambda: set_graphs_per_screen(1, 'vertical'))
-settings_menu.add_command(label="2 Graphs Vertical", command=lambda: set_graphs_per_screen(2, 'vertical'))
-settings_menu.add_command(label="3 Graphs Vertical", command=lambda: set_graphs_per_screen(3, 'vertical'))
-settings_menu.add_command(label="4 Graphs Vertical", command=lambda: set_graphs_per_screen(4, 'vertical'))
+# Add options to the "Settings" menu for number of channels per graph
+settings_menu.add_command(label="1 Channel Horizontal", command=lambda: set_graphs_per_screen(1, 'horizontal'))
+settings_menu.add_command(label="2 Channels Horizontal", command=lambda: set_graphs_per_screen(2, 'horizontal'))
+settings_menu.add_command(label="3 Channels Horizontal", command=lambda: set_graphs_per_screen(3, 'horizontal'))
+settings_menu.add_command(label="4 Channels Horizontal", command=lambda: set_graphs_per_screen(4, 'horizontal'))
+settings_menu.add_command(label="1 Channel Vertical", command=lambda: set_graphs_per_screen(1, 'vertical'))
+settings_menu.add_command(label="2 Channels Vertical", command=lambda: set_graphs_per_screen(2, 'vertical'))
+settings_menu.add_command(label="3 Channels Vertical", command=lambda: set_graphs_per_screen(3, 'vertical'))
+settings_menu.add_command(label="4 Channels Vertical", command=lambda: set_graphs_per_screen(4, 'vertical'))
+
 # Create a frame for the controls
 control_frame = tk.Frame(root)
 control_frame.pack(side=tk.BOTTOM, fill=tk.X)
+
+# Create a "Compare" menu
+compare_menu = tk.Menu(menu_bar, tearoff=0)
+menu_bar.add_cascade(label="Compare", menu=compare_menu)
+
+# Add "Compare" option
+compare_menu.add_command(label="Enable Compare Mode", command=lambda: set_graphs_per_screen(channels_per_graph, layout='horizontal', compare=True))
+compare_menu.add_command(label="Disable Compare Mode", command=lambda: set_graphs_per_screen(channels_per_graph, layout='horizontal', compare=False))
 
 # Create a frame for the canvas
 canvas_frame = tk.Frame(root)
@@ -235,7 +242,7 @@ data_type_label = tk.Label(canvas_frame, text="Data Type", font=("Arial", 20))
 data_type_label.pack(side=tk.LEFT, padx=10, pady=10)
 
 # Initialize pagination slider
-num_pages = (data.shape[1] - 1) // (channels_per_graph * 2) + 1
+num_pages = (data.shape[1] - 1) // channels_per_graph + 1
 pagination_slider = PaginationSlider(control_frame, num_pages)
 pagination_slider.pack(side=tk.BOTTOM, fill=tk.X)
 
