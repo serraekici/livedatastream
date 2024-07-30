@@ -62,7 +62,12 @@ def update_graphs(val):
 
 def update_data_continuously():
     global data
-    data = update_data(num_channels, num_points)
+    # Veri boyutlarını artırarak eski verilerle birleştiriyoruz
+    new_data = update_data(num_channels, num_points)
+    data = np.concatenate((data, new_data), axis=1)  # Eski verilerle yeni verileri birleştir
+    num_points_total = data.shape[1]  # Toplam veri noktası sayısı
+    num_pages = (num_points_total - 1) // (channels_per_graph * 2) + 1  # Sayfa sayısını yeniden hesapla
+    pagination_slider.num_pages = num_pages  # Sayfa sayısını güncelle
     update_graphs(pagination_slider.current_page)
     global after_id
     after_id = root.after(1000, update_data_continuously)
@@ -191,12 +196,10 @@ settings_menu.add_command(label="1 Graph Horizontal", command=lambda: set_graphs
 settings_menu.add_command(label="2 Graphs Horizontal", command=lambda: set_graphs_per_screen(2, 'horizontal'))
 settings_menu.add_command(label="3 Graphs Horizontal", command=lambda: set_graphs_per_screen(3, 'horizontal'))
 settings_menu.add_command(label="4 Graphs Horizontal", command=lambda: set_graphs_per_screen(4, 'horizontal'))
-settings_menu.add_command(label="5 Graphs Horizontal", command=lambda: set_graphs_per_screen(5, 'horizontal'))
 settings_menu.add_command(label="1 Graph Vertical", command=lambda: set_graphs_per_screen(1, 'vertical'))
 settings_menu.add_command(label="2 Graphs Vertical", command=lambda: set_graphs_per_screen(2, 'vertical'))
 settings_menu.add_command(label="3 Graphs Vertical", command=lambda: set_graphs_per_screen(3, 'vertical'))
 settings_menu.add_command(label="4 Graphs Vertical", command=lambda: set_graphs_per_screen(4, 'vertical'))
-settings_menu.add_command(label="5 Graphs Vertical", command=lambda: set_graphs_per_screen(5, 'vertical'))
 
 # Create a frame for the controls
 control_frame = tk.Frame(root)
@@ -221,7 +224,7 @@ data_type_label = tk.Label(canvas_frame, text="Data Type", font=("Arial", 20))
 data_type_label.pack(side=tk.LEFT, padx=10, pady=10)
 
 # Create the pagination slider
-num_pages = num_channels // (channels_per_graph * 2)
+num_pages = (num_channels - 1) // (channels_per_graph * 2) + 1
 pagination_slider = PaginationSlider(control_frame, num_pages)
 pagination_slider.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
 
