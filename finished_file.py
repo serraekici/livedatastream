@@ -1,13 +1,13 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import tkinter as tk
 from tkinter import ttk
+import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 def generate_data(num_channels, num_points):
     return np.random.randn(num_channels, num_points)
 
-def update_data(num_channels,):
+def update_data(num_channels, num_points):
     new_data = generate_data(num_channels, num_points)
     return new_data
 
@@ -49,8 +49,8 @@ def update_graphs(val):
 
 def update_data_continuously():
     global data
-    data = update_data(num_channels)
-    update_graphs(slider.get())
+    data = update_data(num_channels, num_points)
+    update_graphs(pagination_slider.current_page)
     root.after(1000, update_data_continuously)
 
 def set_graphs_per_screen(value):
@@ -59,7 +59,46 @@ def set_graphs_per_screen(value):
     fig, axs = create_graphs(data, 0, channels_per_graph)
     canvas.figure = fig
     canvas.draw()
-    update_graphs(slider.get())
+    update_graphs(pagination_slider.current_page)
+
+class PaginationSlider(tk.Frame):
+    def __init__(self, parent, num_pages, *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+        self.num_pages = num_pages
+        self.current_page = 0
+
+        self.prev_button = tk.Button(self, text='<', command=self.prev_page)
+        self.prev_button.pack(side=tk.LEFT)
+
+        self.page_dots = []
+        self.dot_frame = tk.Frame(self)
+        self.dot_frame.pack(side=tk.LEFT)
+
+        for i in range(num_pages):
+            dot = tk.Label(self.dot_frame, text='●' if i == self.current_page else '○', font=('Arial', 20))
+            dot.pack(side=tk.LEFT)
+            self.page_dots.append(dot)
+
+        self.next_button = tk.Button(self, text='>', command=self.next_page)
+        self.next_button.pack(side=tk.LEFT)
+
+        self.update_dots()
+
+    def update_dots(self):
+        for i, dot in enumerate(self.page_dots):
+            dot.config(text='●' if i == self.current_page else '○')
+
+    def prev_page(self):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.update_dots()
+            update_graphs(self.current_page)
+
+    def next_page(self):
+        if self.current_page < self.num_pages - 1:
+            self.current_page += 1
+            self.update_dots()
+            update_graphs(self.current_page)
 
 # Initialize data
 num_channels = 20
@@ -100,13 +139,10 @@ canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
 canvas.draw()
 canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
-# Create a style for the slider
-style = ttk.Style()
-style.configure("TScale", sliderthickness=15)
-
-# Create and pack the slider
-slider = ttk.Scale(control_frame, from_=0, to=(num_channels // (channels_per_graph * 2)) - 1, orient=tk.HORIZONTAL, command=update_graphs, style="TScale")
-slider.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
+# Create the pagination slider
+num_pages = num_channels // (channels_per_graph * 2)
+pagination_slider = PaginationSlider(control_frame, num_pages)
+pagination_slider.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
 
 # Start the continuous data update
 root.after(1000, update_data_continuously)
