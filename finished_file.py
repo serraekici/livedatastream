@@ -1,8 +1,9 @@
 import tkinter as tk
 from tkinter import ttk
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
 
 def generate_data(num_channels, num_points):
     return np.random.randn(num_channels, num_points)
@@ -33,24 +34,24 @@ def create_graphs(data, start_channel, channels_per_graph=1):
     return fig, axs
 
 def update_graphs(val):
-    global canvas, fig, axs, data, num_channels, channels_per_graph
+    global canvas, fig, axs, data, num_channels, channels_per_graph, zoom_limits
     start_channel = int(val) * channels_per_graph * 2
-
-    # Eksenleri temizle
-    for ax in axs:
-        ax.clear()
-        ax.set_visible(True)  # Eksenleri yeniden görünür yap
 
     # Verileri güncelle
     for i in range(channels_per_graph):
         channel_index = start_channel + i * 2
+        ax = axs[i]
+        ax.clear()
         if channel_index + 1 < num_channels:
-            axs[i].plot(data[channel_index], label=f'Channel {channel_index}')
-            axs[i].plot(data[channel_index + 1], label=f'Channel {channel_index + 1}')
-            axs[i].set_facecolor("white")
-            axs[i].legend()
+            ax.plot(data[channel_index], label=f'Channel {channel_index}')
+            ax.plot(data[channel_index + 1], label=f'Channel {channel_index + 1}')
+            ax.set_facecolor("white")
+            ax.legend()
+            if ax in zoom_limits:
+                ax.set_xlim(zoom_limits[ax]['xlim'])
+                ax.set_ylim(zoom_limits[ax]['ylim'])
         else:
-            axs[i].set_visible(False)  # Kullanılmayan eksenleri gizle
+            ax.set_visible(False)  # Kullanılmayan eksenleri gizle
     
     fig.tight_layout()  # Grafikleri düzgün hizalamak için
     canvas.draw()
@@ -79,9 +80,41 @@ def set_graphs_per_screen(value):
     canvas.draw()
     canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
+    # Zoom özelliklerini etkinleştir
+    enable_zoom(canvas)
+
 def update_data_type_label(data_type):
     data_type_label.config(text=data_type)
     update_graphs(pagination_slider.current_page)
+
+def enable_zoom(canvas):
+    def zoom(event):
+        ax = event.inaxes
+        if not ax:
+            return
+        xdata, ydata = event.xdata, event.ydata
+        if event.button == 'up':
+            scale_factor = 1.1
+        elif event.button == 'down':
+            scale_factor = 0.9
+        else:
+            scale_factor = 1
+
+        cur_xlim = ax.get_xlim()
+        cur_ylim = ax.get_ylim()
+
+        new_xlim = [xdata - (xdata - cur_xlim[0]) * scale_factor,
+                    xdata + (cur_xlim[1] - xdata) * scale_factor]
+        new_ylim = [ydata - (ydata - cur_ylim[0]) * scale_factor,
+                    ydata + (cur_ylim[1] - ydata) * scale_factor]
+
+        ax.set_xlim(new_xlim)
+        ax.set_ylim(new_ylim)
+
+        zoom_limits[ax] = {'xlim': new_xlim, 'ylim': new_ylim}
+        canvas.draw_idle()
+
+    canvas.mpl_connect('scroll_event', zoom)
 
 class PaginationSlider(tk.Frame):
     def __init__(self, parent, num_pages, *args, **kwargs):
@@ -168,6 +201,10 @@ fig, axs = create_graphs(data, 0, channels_per_graph)
 canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
 canvas.draw()
 canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+# Zoom özelliklerini etkinleştir
+zoom_limits = {}
+enable_zoom(canvas)
 
 # Create a label for the data type
 data_type_label = tk.Label(canvas_frame, text="Data Type", font=("Arial", 20))
