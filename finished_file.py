@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+from matplotlib.widgets import Cursor
 
 def generate_data(num_channels, num_points):
     return np.random.randn(num_channels, num_points)
@@ -27,10 +28,11 @@ def create_graphs(data, start_channel, channels_per_graph=1, layout='horizontal'
     for i in range(channels_per_graph):
         channel_index = start_channel + i * 2
         if channel_index + 1 < num_channels:
-            axs[i].plot(data[channel_index], label=f'Channel {channel_index}')
-            axs[i].plot(data[channel_index + 1], label=f'Channel {channel_index + 1}')
+            axs[i].plot(data[channel_index], label=f'Channel {channel_index}', marker='o')
+            axs[i].plot(data[channel_index + 1], label=f'Channel {channel_index + 1}', marker='o')
             axs[i].set_facecolor("white")
             axs[i].legend()
+            axs[i].grid(True)
         else:
             axs[i].set_visible(False)
     
@@ -47,10 +49,11 @@ def update_graphs(val):
         ax = axs[i]
         ax.clear()
         if channel_index + 1 < num_channels:
-            ax.plot(data[channel_index], label=f'Channel {channel_index}')
-            ax.plot(data[channel_index + 1], label=f'Channel {channel_index + 1}')
+            ax.plot(data[channel_index], label=f'Channel {channel_index}', marker='o')
+            ax.plot(data[channel_index + 1], label=f'Channel {channel_index + 1}', marker='o')
             ax.set_facecolor("white")
             ax.legend()
+            ax.grid(True)
             if ax in zoom_limits:
                 ax.set_xlim(zoom_limits[ax]['xlim'])
                 ax.set_ylim(zoom_limits[ax]['ylim'])
@@ -70,7 +73,7 @@ def update_data_continuously():
     pagination_slider.num_pages = num_pages  # Sayfa sayısını güncelle
     update_graphs(pagination_slider.current_page)
     global after_id
-    after_id = root.after(2000, update_data_continuously)
+    after_id = root.after(2000, update_data_continuously)  # 2 saniye (2000 milisaniye) gecikme
 
 def set_graphs_per_screen(value, layout='horizontal'):
     global channels_per_graph, fig, axs, canvas
@@ -124,6 +127,10 @@ def enable_zoom(canvas):
         canvas.draw_idle()
 
     canvas.mpl_connect('scroll_event', zoom)
+
+def add_cursor(ax):
+    cursor = Cursor(ax, useblit=True, color='red', linewidth=1)
+    return cursor
 
 class PaginationSlider(tk.Frame):
     def __init__(self, parent, num_pages, *args, **kwargs):
@@ -202,35 +209,38 @@ settings_menu.add_command(label="2 Graphs Vertical", command=lambda: set_graphs_
 settings_menu.add_command(label="3 Graphs Vertical", command=lambda: set_graphs_per_screen(3, 'vertical'))
 settings_menu.add_command(label="4 Graphs Vertical", command=lambda: set_graphs_per_screen(4, 'vertical'))
 settings_menu.add_command(label="5 Graphs Vertical", command=lambda: set_graphs_per_screen(5, 'vertical'))
-# Create a frame for the controls
-control_frame = tk.Frame(root)
-control_frame.pack(side=tk.BOTTOM, fill=tk.X)
-
-# Create a frame for the canvas
+settings_menu.add_command(label="6 Graphs Vertical", command=lambda: set_graphs_per_screen(6, 'vertical'))
+settings_menu.add_command(label="7 Graphs Vertical", command=lambda: set_graphs_per_screen(7, 'vertical'))
+settings_menu.add_command(label="8 Graphs Vertical", command=lambda: set_graphs_per_screen(8, 'vertical'))
+settings_menu.add_command(label="9 Graphs Vertical", command=lambda: set_graphs_per_screen(9, 'vertical'))
+settings_menu.add_command(label="10 Graphs Vertical", command=lambda: set_graphs_per_screen(10, 'vertical'))
+# Create canvas frame
 canvas_frame = tk.Frame(root)
-canvas_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+canvas_frame.pack(fill=tk.BOTH, expand=True)
 
-# Create the initial figure and canvas
+# Create initial graphs
 fig, axs = create_graphs(data, 0, channels_per_graph)
+
+# Create a canvas to display the graphs
 canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
 canvas.draw()
 canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
-# Zoom özelliklerini etkinleştir
+# Add cursors to axes
 zoom_limits = {}
-enable_zoom(canvas)
+for ax in axs:
+    add_cursor(ax)
 
 # Create a label for the data type
 data_type_label = tk.Label(canvas_frame, text="Data Type", font=("Arial", 20))
 data_type_label.pack(side=tk.LEFT, padx=10, pady=10)
 
-# Create the pagination slider
-num_pages = (num_channels - 1) // (channels_per_graph * 2) + 1
-pagination_slider = PaginationSlider(control_frame, num_pages)
-pagination_slider.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
+# Initialize pagination slider
+pagination_slider = PaginationSlider(root, 1)
+pagination_slider.pack(side=tk.BOTTOM, fill=tk.X)
 
-# Initialize `after_id` to store the id of the `after` call
-after_id = root.after(2000, update_data_continuously)
+# Start data update loop
+update_data_continuously()
 
-# Start the Tkinter main loop
+# Start the Tkinter event loop
 root.mainloop()
