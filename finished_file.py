@@ -11,10 +11,14 @@ def generate_data(num_channels, num_points):
 def update_data(num_channels, num_points):
     return generate_data(num_channels, num_points)
 
-def create_graphs(data, start_channel, channels_per_graph=1):
+def create_graphs(data, start_channel, channels_per_graph=1, layout='horizontal'):
     num_channels, num_points = data.shape
-    fig, axs = plt.subplots(1, channels_per_graph, figsize=(15, 5))
     
+    if layout == 'horizontal':
+        fig, axs = plt.subplots(1, channels_per_graph, figsize=(15, 5))
+    else:  # vertical
+        fig, axs = plt.subplots(channels_per_graph, 1, figsize=(5, 15))
+
     if channels_per_graph == 1:
         axs = [axs]  # Tek bir eksen varsa, listeye dönüştür
     else:
@@ -63,7 +67,7 @@ def update_data_continuously():
     global after_id
     after_id = root.after(1000, update_data_continuously)
 
-def set_graphs_per_screen(value):
+def set_graphs_per_screen(value, layout='horizontal'):
     global channels_per_graph, fig, axs, canvas
 
     channels_per_graph = int(value)
@@ -73,7 +77,7 @@ def set_graphs_per_screen(value):
     fig.clf()  # Figürün içeriğini temizle
 
     # Yeni figür ve eksenleri oluştur
-    fig, axs = create_graphs(data, 0, channels_per_graph)
+    fig, axs = create_graphs(data, 0, channels_per_graph, layout=layout)
 
     # Canvas'ı yeniden oluştur
     canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
@@ -183,10 +187,16 @@ settings_menu = tk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Settings", menu=settings_menu)
 
 # Add options to the "Settings" menu for number of graphs per screen
-settings_menu.add_command(label="1 Graph", command=lambda: set_graphs_per_screen(1))
-settings_menu.add_command(label="2 Graphs", command=lambda: set_graphs_per_screen(2))
-settings_menu.add_command(label="3 Graphs", command=lambda: set_graphs_per_screen(3))
-settings_menu.add_command(label="4 Graphs", command=lambda: set_graphs_per_screen(4))
+settings_menu.add_command(label="1 Graph Horizontal", command=lambda: set_graphs_per_screen(1, 'horizontal'))
+settings_menu.add_command(label="2 Graphs Horizontal", command=lambda: set_graphs_per_screen(2, 'horizontal'))
+settings_menu.add_command(label="3 Graphs Horizontal", command=lambda: set_graphs_per_screen(3, 'horizontal'))
+settings_menu.add_command(label="4 Graphs Horizontal", command=lambda: set_graphs_per_screen(4, 'horizontal'))
+settings_menu.add_command(label="5 Graphs Horizontal", command=lambda: set_graphs_per_screen(5, 'horizontal'))
+settings_menu.add_command(label="1 Graph Vertical", command=lambda: set_graphs_per_screen(1, 'vertical'))
+settings_menu.add_command(label="2 Graphs Vertical", command=lambda: set_graphs_per_screen(2, 'vertical'))
+settings_menu.add_command(label="3 Graphs Vertical", command=lambda: set_graphs_per_screen(3, 'vertical'))
+settings_menu.add_command(label="4 Graphs Vertical", command=lambda: set_graphs_per_screen(4, 'vertical'))
+settings_menu.add_command(label="5 Graphs Vertical", command=lambda: set_graphs_per_screen(5, 'vertical'))
 
 # Create a frame for the controls
 control_frame = tk.Frame(root)
