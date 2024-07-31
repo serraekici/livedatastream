@@ -1,5 +1,4 @@
 import tkinter as tk
-from tkinter import simpledialog, messagebox
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -94,7 +93,7 @@ class LiveDataApp:
     def __init__(self, root):
         self.root = root
         self.num_channels = 120
-        self.num_points = 50
+        self.num_points = 1
         self.channels_per_graph = 1
         self.compare_mode = False
         self.compare_channels = []
