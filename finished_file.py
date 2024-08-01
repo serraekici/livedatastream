@@ -90,21 +90,24 @@ class GraphManager:
         cursor = Cursor(ax, useblit=True, color='red', linewidth=1)
         return cursor
 
-    def update_graphs(self, val):
-        start_channel = int(val) * self.app.channels_per_graph * 2 if self.app.compare_mode else int(val) * self.app.channels_per_graph
+    def update_graphs(self, start_channel):
+        num_channels, num_points = self.app.data.shape
+        num_graphs = self.app.channels_per_graph
+        num_pages = (num_channels - 1) // num_graphs + 1
+        self.app.pagination_slider.update_dots(num_pages)
 
         for i in range(self.app.channels_per_graph):
             ax = self.axs[i]
             ax.clear()
-            if self.app.compare_mode:
-                self.plot_compare_data(ax, self.app.data, self.app.compare_channels, i, self.app.num_channels)
+            channel_index = start_channel + i
+            if channel_index < num_channels:
+                ax.plot(self.app.data[channel_index], label=f'Channel {channel_index}', marker='o')
+                ax.set_facecolor("white")
+                ax.legend()
+                ax.grid(True)
             else:
-                channel_index = start_channel + i
-                if channel_index < self.app.num_channels:
-                    ax.plot(self.app.data[channel_index], label=f'Channel {channel_index}', marker='o')
-                    ax.set_facecolor("white")
-                    ax.legend()
-                    ax.grid(True)
+                ax.set_visible(False)
+
             if ax in self.zoom_limits:
                 ax.set_xlim(self.zoom_limits[ax]['xlim'])
                 ax.set_ylim(self.zoom_limits[ax]['ylim'])
@@ -131,7 +134,8 @@ class GraphManager:
 
     def update_data_type_label(self, data_type):
         self.app.data_type_label.config(text=data_type)
-        self.update_graphs(self.app.pagination_slider.current_page)
+        start_channel = (self.app.pagination_slider.current_page - 1) * self.app.channels_per_graph
+        self.update_graphs(start_channel)
 
 
 class DataUpdater:
@@ -144,12 +148,9 @@ class DataUpdater:
 
     def update_data_continuously(self):
         self.update_data()
-        num_points_total = self.app.data.shape[1]
-        num_pages = (num_points_total - 1) // (self.app.channels_per_graph * 2) + 1
-        self.app.pagination_slider.num_pages = num_pages
-        self.app.pagination_slider.update_dots()
-        self.app.graph_manager.update_graphs(self.app.pagination_slider.current_page)
+        self.app.graph_manager.update_graphs(self.app.pagination_slider.current_page * self.app.channels_per_graph)
         self.app.after_id = self.app.root.after(2000, self.update_data_continuously)
+
 
 class InterfaceApplications:
     def __init__(self, root):
@@ -230,8 +231,40 @@ class InterfaceApplications:
         self.graph_manager = GraphManager(self.canvas_frame, self)
         self.graph_manager.set_graphs_per_screen(self.channels_per_graph, layout='horizontal')
 
+        # Pagination controls with arrows
+        self.pagination_frame = tk.Frame(self.root)
+        self.pagination_frame.pack(pady=10)
+
+        self.prev_button = tk.Button(self.pagination_frame, text="◄", command=self.prev_page)
+        self.prev_button.pack(side=tk.LEFT)
+
+        self.next_button = tk.Button(self.pagination_frame, text="►", command=self.next_page)
+        self.next_button.pack(side=tk.LEFT)
+
+        self.page_label = tk.Label(self.pagination_frame, text="Page 1")
+        self.page_label.pack(side=tk.LEFT)
+
         self.pagination_slider = PaginationSlider(self.root, self)
         self.pagination_slider.pack()
+
+        self.update_page_label()
+
+    def prev_page(self):
+        if self.pagination_slider.current_page > 1:
+            self.pagination_slider.current_page -= 1
+            start_channel = (self.pagination_slider.current_page - 1) * self.channels_per_graph
+            self.graph_manager.update_graphs(start_channel)
+            self.update_page_label()
+
+    def next_page(self):
+        if self.pagination_slider.current_page < self.pagination_slider.num_pages:
+            self.pagination_slider.current_page += 1
+            start_channel = (self.pagination_slider.current_page - 1) * self.channels_per_graph
+            self.graph_manager.update_graphs(start_channel)
+            self.update_page_label()
+
+    def update_page_label(self):
+        self.page_label.config(text=f"Page {self.pagination_slider.current_page} of {self.pagination_slider.num_pages}")
 
     def destroy(self):
         if self.after_id is not None:
@@ -243,27 +276,21 @@ class PaginationSlider(tk.Frame):
     def __init__(self, master, app):
         super().__init__(master)
         self.app = app
-        self.current_page = 0
+        self.current_page = 1
         self.num_pages = 1
-
-        self.slider = tk.Scale(self, from_=0, to=self.num_pages-1, orient=tk.HORIZONTAL, command=self.page_changed)
-        self.slider.pack(fill=tk.X)
 
         self.dots_frame = tk.Frame(self)
         self.dots_frame.pack()
 
-    def page_changed(self, val):
-        self.current_page = int(val)
-        self.app.graph_manager.update_graphs(self.current_page)
-
-    def update_dots(self):
+    def update_dots(self, num_pages):
+        self.num_pages = num_pages
         for widget in self.dots_frame.winfo_children():
             widget.destroy()
 
-        for i in range(self.num_pages):
+        for i in range(num_pages):
             dot = tk.Label(self.dots_frame, text="•", font=("Arial", 14))
             dot.pack(side=tk.LEFT)
-            if i == self.current_page:
+            if i == self.current_page - 1:
                 dot.config(fg="blue")
             else:
                 dot.config(fg="gray")
@@ -274,3 +301,4 @@ if __name__ == "__main__":
     app = InterfaceApplications(root)
     root.protocol("WM_DELETE_WINDOW", app.destroy)
     root.mainloop()
+        
