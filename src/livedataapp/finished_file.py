@@ -5,12 +5,10 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from matplotlib.widgets import Cursor
 
-
 class DataGenerator:
     @staticmethod
     def generate_data(num_channels, num_points):
         return np.random.randn(num_channels, num_points)
-
 
 class GraphManager:
     def __init__(self, canvas_frame, app):
@@ -45,6 +43,7 @@ class GraphManager:
                     ax.set_visible(False)
 
         fig.tight_layout()
+        print(f"Created {len(axs)} subplots.")
         return fig, axs
 
     def plot_compare_data(self, ax, data, compare_channels, i, num_channels):
@@ -91,26 +90,36 @@ class GraphManager:
         return cursor
 
     def update_graphs(self, val):
+        if self.fig is None:
+            print("Error: Figure is not initialized.")
+            return
+
         start_channel = int(val) * self.app.channels_per_graph * 2 if self.app.compare_mode else int(val) * self.app.channels_per_graph
 
         for i in range(self.app.channels_per_graph):
-            ax = self.axs[i]
-            ax.clear()
-            if self.app.compare_mode:
-                self.plot_compare_data(ax, self.app.data, self.app.compare_channels, i, self.app.num_channels)
-            else:
-                channel_index = start_channel + i
-                if channel_index < self.app.num_channels:
-                    ax.plot(self.app.data[channel_index], label=f'Channel {channel_index}', marker='o')
-                    ax.set_facecolor("white")
-                    ax.legend()
-                    ax.grid(True)
-            if ax in self.zoom_limits:
-                ax.set_xlim(self.zoom_limits[ax]['xlim'])
-                ax.set_ylim(self.zoom_limits[ax]['ylim'])
+            try:
+                ax = self.axs[i]
+                ax.clear()
+                if self.app.compare_mode:
+                    self.plot_compare_data(ax, self.app.data, self.app.compare_channels, i, self.app.num_channels)
+                else:
+                    channel_index = start_channel + i
+                    if channel_index < self.app.num_channels:
+                        ax.plot(self.app.data[channel_index], label=f'Channel {channel_index}', marker='o')
+                        ax.set_facecolor("white")
+                        ax.legend()
+                        ax.grid(True)
+                if ax in self.zoom_limits:
+                    ax.set_xlim(self.zoom_limits[ax]['xlim'])
+                    ax.set_ylim(self.zoom_limits[ax]['ylim'])
+            except IndexError as e:
+                print(f"IndexError: {e} - i: {i}, len(self.axs): {len(self.axs)}")
 
-        self.fig.tight_layout()
-        self.canvas.draw()
+        if self.fig:
+            self.fig.tight_layout()
+            self.canvas.draw()
+        else:
+            print("Error: Figure object is None.")
 
     def set_graphs_per_screen(self, value, layout='horizontal', compare=False, compare_channels=[]):
         self.app.channels_per_graph = int(value)
@@ -123,16 +132,15 @@ class GraphManager:
         self.fig, self.axs = self.create_graphs(
             self.app.data, 0, self.app.channels_per_graph, layout=layout, compare=self.app.compare_mode, compare_channels=compare_channels)
 
+        if self.fig is None:
+            print("Error: Figure was not created.")
+            return
+
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.canvas_frame)
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
         self.enable_zoom(self.canvas)
-
-    def update_data_type_label(self, data_type):
-        self.app.data_type_label.config(text=data_type)
-        self.update_graphs(self.app.pagination_slider.current_page)
-
 
 class DataUpdater:
     def __init__(self, app):
@@ -144,12 +152,10 @@ class DataUpdater:
 
     def update_data_continuously(self):
         self.update_data()
-        num_points_total = self.app.data.shape[1]
-        num_pages = (num_points_total - 1) // (self.app.channels_per_graph * 2) + 1
-        self.app.pagination_slider.num_pages = num_pages
-        self.app.pagination_slider.update_dots()
-        self.app.graph_manager.update_graphs(self.app.pagination_slider.current_page)
+        start_channel = (self.app.pagination_slider.current_page - 1) * self.app.channels_per_graph
+        self.app.graph_manager.update_graphs(start_channel)
         self.app.after_id = self.app.root.after(2000, self.update_data_continuously)
+
 
 class InterfaceApplications:
     def __init__(self, root):
@@ -160,10 +166,14 @@ class InterfaceApplications:
         self.compare_mode = False
         self.compare_channels = []
         self.data = DataGenerator.generate_data(self.num_channels, self.num_points)
+        
 
         self.init_ui()
         self.data_updater = DataUpdater(self)
         self.data_updater.update_data_continuously()
+
+    def destroy(self):
+        self.root.destroy()
 
     def open_compare_dialog(self):
         self.compare_channels = []
@@ -224,50 +234,86 @@ class InterfaceApplications:
         self.data_type_label = tk.Label(self.root, text="Brain Voltage", font=("Arial", 16))
         self.data_type_label.pack(pady=10)
 
+        # Pagination controls with arrows
+        self.pagination_frame = tk.Frame(self.root)
+        self.pagination_frame.pack(pady=10, side=tk.TOP)
+
+        self.prev_button = tk.Button(self.pagination_frame, text="◄", command=self.prev_page)
+        self.prev_button.pack(side=tk.LEFT)
+
+        self.next_button = tk.Button(self.pagination_frame, text="►", command=self.next_page)
+        self.next_button.pack(side=tk.LEFT)
+
+        self.page_label = tk.Label(self.pagination_frame, text="Page 1")
+        self.page_label.pack(side=tk.LEFT)
+
+        num_channels = self.data.shape[0]
+        num_pages = (num_channels - 1) // self.channels_per_graph + 1
+        self.pagination_slider = PaginationSlider(self, num_pages)
+        self.pagination_slider.pack(pady=10)
+
         self.canvas_frame = tk.Frame(self.root)
-        self.canvas_frame.pack(fill=tk.BOTH, expand=True)
+        self.canvas_frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
         self.graph_manager = GraphManager(self.canvas_frame, self)
-        self.graph_manager.set_graphs_per_screen(self.channels_per_graph, layout='horizontal')
+        self.graph_manager.set_graphs_per_screen(self.channels_per_graph, layout='horizontal', compare=self.compare_mode, compare_channels=self.compare_channels)
 
-        self.pagination_slider = PaginationSlider(self.root, self)
-        self.pagination_slider.pack()
+    def next_page(self):
+        num_channels, num_points = self.data.shape
+        num_graphs = self.channels_per_graph
+        num_pages = (num_channels - 1) // num_graphs + 1
+        if self.pagination_slider.current_page < num_pages:
+            self.pagination_slider.current_page += 1
+            self.update_page_label()
 
-    def destroy(self):
-        if self.after_id is not None:
-            self.root.after_cancel(self.after_id)
-        self.root.destroy()
+    def prev_page(self):
+        if self.pagination_slider.current_page > 1:
+            self.pagination_slider.current_page -= 1
+            self.update_page_label()
 
+    def update_page_label(self):
+        self.page_label.config(text=f"Page {self.pagination_slider.current_page}")
+        start_channel = (self.pagination_slider.current_page - 1) * self.channels_per_graph
+        self.graph_manager.update_graphs(start_channel)
 
 class PaginationSlider(tk.Frame):
-    def __init__(self, master, app):
-        super().__init__(master)
-        self.app = app
-        self.current_page = 0
-        self.num_pages = 1
+    def __init__(self, parent, num_pages=1):
+        super().__init__(parent.root)
+        self.parent = parent
+        self.num_pages = num_pages
+        self.current_page = 1
+        self.dots = []
+        self.create_widgets()
 
-        self.slider = tk.Scale(self, from_=0, to=self.num_pages-1, orient=tk.HORIZONTAL, command=self.page_changed)
-        self.slider.pack(fill=tk.X)
-
-        self.dots_frame = tk.Frame(self)
-        self.dots_frame.pack()
-
-    def page_changed(self, val):
-        self.current_page = int(val)
-        self.app.graph_manager.update_graphs(self.current_page)
-
-    def update_dots(self):
-        for widget in self.dots_frame.winfo_children():
-            widget.destroy()
-
+    def create_widgets(self):
         for i in range(self.num_pages):
-            dot = tk.Label(self.dots_frame, text="•", font=("Arial", 14))
-            dot.pack(side=tk.LEFT)
-            if i == self.current_page:
+            dot = tk.Label(self, text="•", font=("Arial", 24))
+            dot.pack(side=tk.LEFT, padx=2)
+            self.dots.append(dot)
+        self.update_dots(self.num_pages)
+
+    def update_dots(self, num_pages):
+        for dot in self.dots:
+            dot.destroy()
+        self.dots = []
+
+        self.num_pages = num_pages
+        for i in range(self.num_pages):
+            dot = tk.Label(self, text="•", font=("Arial", 24))
+            dot.pack(side=tk.LEFT, padx=2)
+            self.dots.append(dot)
+        self.highlight_current_page()
+
+    def highlight_current_page(self):
+        for i, dot in enumerate(self.dots):
+            if i == self.current_page - 1:
                 dot.config(fg="blue")
             else:
-                dot.config(fg="gray")
+                dot.config(fg="black")
 
+    def set_current_page(self, page):
+        self.current_page = page
+        self.highlight_current_page()
 
 if __name__ == "__main__":
     root = tk.Tk()
