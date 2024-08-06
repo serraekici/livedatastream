@@ -124,9 +124,10 @@ class GraphManager:
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.canvas_frame)
         self.canvas.draw()
-        self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
         self.enable_zoom(self.canvas)
+        self.app.pagination_slider.update_pages()
 
     def update_data_type_label(self, data_type):
         self.app.data_type_label.config(text=data_type)
@@ -240,14 +241,14 @@ class InterfaceApplications:
         self.data_type_label = tk.Label(self.root, text="Brain Voltage", font=("Arial", 16))
         self.data_type_label.pack(pady=10)
 
+        self.pagination_slider = PaginationSlider(self.root, self)
+        self.pagination_slider.pack(side=tk.TOP, fill=tk.X)
+
         self.canvas_frame = tk.Frame(self.root)
         self.canvas_frame.pack(fill=tk.BOTH, expand=True)
 
         self.graph_manager = GraphManager(self.canvas_frame, self)
         self.graph_manager.set_graphs_per_screen(self.channels_per_graph, layout='horizontal')
-
-        self.pagination_slider = PaginationSlider(self.root, self)
-        self.pagination_slider.pack()
 
     def destroy(self):
         if self.data_updater:
@@ -261,15 +262,41 @@ class PaginationSlider(tk.Frame):
         self.current_page = 0
         self.num_pages = 1
 
-        self.slider = tk.Scale(self, from_=0, to=self.num_pages-1, orient=tk.HORIZONTAL, command=self.page_changed)
-        self.slider.pack(fill=tk.X)
+        self.prev_button = tk.Button(self, text="←", command=self.prev_page)
+        self.prev_button.pack(side=tk.LEFT)
+
+        self.slider = tk.Scale(self, from_=0, to=self.num_pages-1, orient=tk.HORIZONTAL, showvalue=False)
+        self.slider.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        self.next_button = tk.Button(self, text="→", command=self.next_page)
+        self.next_button.pack(side=tk.LEFT)
 
         self.dots_frame = tk.Frame(self)
         self.dots_frame.pack()
 
-    def page_changed(self, val):
-        self.current_page = int(val)
+        self.slider.bind("<ButtonRelease-1>", self.page_changed)
+        self.slider.bind("<B1-Motion>", self.page_changing)
+
+    def prev_page(self):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.slider.set(self.current_page)
+            self.page_changed(None)
+
+    def next_page(self):
+        if self.current_page < self.num_pages - 1:
+            self.current_page += 1
+            self.slider.set(self.current_page)
+            self.page_changed(None)
+
+    def page_changing(self, event):
+        self.current_page = int(self.slider.get())
+        self.update_dots()
+
+    def page_changed(self, event):
+        self.current_page = int(self.slider.get())
         self.app.graph_manager.update_graphs(self.current_page)
+        self.update_dots()
 
     def update_dots(self):
         for widget in self.dots_frame.winfo_children():
@@ -282,6 +309,20 @@ class PaginationSlider(tk.Frame):
                 dot.config(fg="blue")
             else:
                 dot.config(fg="gray")
+
+    def update_pages(self):
+        num_channels = self.app.num_channels
+        channels_per_graph = self.app.channels_per_graph
+        compare = self.app.compare_mode
+
+        if compare:
+            num_pages = (num_channels // (channels_per_graph * 2)) + (1 if num_channels % (channels_per_graph * 2) != 0 else 0)
+        else:
+            num_pages = (num_channels // channels_per_graph) + (1 if num_channels % channels_per_graph != 0 else 0)
+
+        self.num_pages = num_pages
+        self.slider.config(to=self.num_pages - 1)
+        self.update_dots()
 
 if __name__ == "__main__":
     root = tk.Tk()
