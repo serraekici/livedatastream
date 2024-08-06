@@ -2,7 +2,6 @@ import tkinter as tk
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.figure import Figure
 from matplotlib.widgets import Cursor
 import serial
 import threading
@@ -146,17 +145,16 @@ class DataUpdater:
                 values = list(map(int, line.split(',')))
                 if len(values) == self.app.num_channels:
                     new_data = np.array(values).reshape(self.app.num_channels, 1)
-                    self.app.data = np.concatenate((self.app.data, new_data), axis=1)
+                    if self.app.data.shape[1] >= 10:  # Only keep the latest 10 data points
+                        self.app.data = np.hstack((self.app.data[:, -9:], new_data))
+                    else:
+                        self.app.data = np.hstack((self.app.data, new_data))
             except ValueError:
                 pass
 
     def update_data_continuously(self):
         while not self.stop_event.is_set():
             self.update_data()
-            num_points_total = self.app.data.shape[1]
-            num_pages = (num_points_total - 1) // (self.app.channels_per_graph * 2) + 1
-            self.app.pagination_slider.num_pages = num_pages
-            self.app.pagination_slider.update_dots()
             self.app.graph_manager.update_graphs(self.app.pagination_slider.current_page)
             self.stop_event.wait(1)
 
@@ -290,4 +288,3 @@ if __name__ == "__main__":
     app = InterfaceApplications(root)
     root.protocol("WM_DELETE_WINDOW", app.destroy)
     root.mainloop()
-
