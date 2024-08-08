@@ -1,11 +1,8 @@
-# src/livedataapp/view/view.py
-
 import tkinter as tk
 from tkinter import simpledialog
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.widgets import Cursor
 
 class GraphManager:
     def __init__(self, canvas_frame, app):
@@ -41,18 +38,6 @@ class GraphManager:
 
         fig.tight_layout()
         return fig, axs
-    
-    def set_view_limits(self, x_min, x_max, y_min, y_max):
-        ax = self.fig.gca()
-        if not ax:
-            return
-
-        ax.set_xlim(x_min, x_max)
-        ax.set_ylim(y_min, y_max)
-        
-        # Zoom limitlerini kaydedelim
-        self.zoom_limits[ax] = {'xlim': [x_min, x_max], 'ylim': [y_min, y_max]}
-        self.canvas.draw_idle()
 
     def plot_compare_data(self, ax, data, compare_channels, i, num_channels):
         if len(compare_channels) > i * 2:
@@ -70,67 +55,83 @@ class GraphManager:
             ax.set_visible(False)
 
     def enable_zoom(self):
-        def zoom(event, scale_factor):
-            ax = self.fig.gca()
-            if not ax:
-                return
+        def zoom(scale_factor, axis='both'):
+            for ax in self.axs:
+                try:
+                    if len(ax.get_lines()) > 0:
+                        xdata, ydata = (sum(ax.get_xlim()) / 2, sum(ax.get_ylim()) / 2)
 
-            xdata, ydata = (sum(ax.get_xlim()) / 2, sum(ax.get_ylim()) / 2)
+                        cur_xlim = ax.get_xlim()
+                        cur_ylim = ax.get_ylim()
 
-            cur_xlim = ax.get_xlim()
-            cur_ylim = ax.get_ylim()
+                        if axis in ['x', 'both']:
+                            new_xlim = [xdata - (xdata - cur_xlim[0]) * scale_factor,
+                                        xdata + (cur_xlim[1] - xdata) * scale_factor]
+                            new_xlim = [max(0, min(new_xlim)), min(len(ax.get_lines()[0].get_xdata()) - 1, max(new_xlim))]
 
-            new_xlim = [xdata - (xdata - cur_xlim[0]) * scale_factor,
-                        xdata + (cur_xlim[1] - xdata) * scale_factor]
-            new_ylim = [ydata - (ydata - cur_ylim[0]) * scale_factor,
-                        ydata + (cur_ylim[1] - ydata) * scale_factor]
+                        if axis in ['y', 'both']:
+                            new_ylim = [ydata - (ydata - cur_ylim[0]) * scale_factor,
+                                        ydata + (cur_ylim[1] - ydata) * scale_factor]
+                            new_ylim = [max(min(ax.get_lines()[0].get_ydata()), min(new_ylim)),
+                                        min(max(ax.get_lines()[0].get_ydata()), max(new_ylim))]
 
-            ax.set_xlim(new_xlim)
-            ax.set_ylim(new_ylim)
+                        ax.set_xlim(new_xlim)
+                        ax.set_ylim(new_ylim)
 
-            self.zoom_limits[ax] = {'xlim': new_xlim, 'ylim': new_ylim}
-            self.canvas.draw_idle()
+                        self.zoom_limits[ax] = {'xlim': new_xlim, 'ylim': new_ylim}
+                        self.canvas.draw_idle()
+                except Exception as e:
+                    print(f"Error during zoom operation: {e}")
 
+        self.zoom_in = lambda: zoom(0.9)
+        self.zoom_out = lambda: zoom(1.1)
 
-    def zoom_in(self):
-        self.zoom(1.1)
+    def zoom_in_menu(self):
+        self.zoom_in()
 
-    def zoom_out(self):
-        self.zoom(0.9)
+    def zoom_out_menu(self):
+        self.zoom_out()
 
+    def zoom_in_x(self):
+        self.zoom(0.9, axis='x')
 
-    def zoom(self, scale_factor):
+    def zoom_out_x(self):
+        self.zoom(1.1, axis='x')
+
+    def zoom_in_y(self):
+        self.zoom(0.9, axis='y')
+
+    def zoom_out_y(self):
+        self.zoom(1.1, axis='y')
+
+    def zoom(self, scale_factor, axis='both'):
         ax = self.fig.gca()
         if not ax:
             return
 
-        xdata, ydata = (sum(ax.get_xlim()) / 2, sum(ax.get_ylim()) / 2)
+        if axis == 'x' or axis == 'both':
+            xdata, _ = (sum(ax.get_xlim()) / 2, sum(ax.get_ylim()) / 2)
+            cur_xlim = ax.get_xlim()
+            new_xlim = [xdata - (xdata - cur_xlim[0]) * scale_factor,
+                        xdata + (cur_xlim[1] - xdata) * scale_factor]
+            ax.set_xlim(new_xlim)
 
-        cur_xlim = ax.get_xlim()
-        cur_ylim = ax.get_ylim()
+        if axis == 'y' or axis == 'both':
+            _, ydata = (sum(ax.get_xlim()) / 2, sum(ax.get_ylim()) / 2)
+            cur_ylim = ax.get_ylim()
+            new_ylim = [ydata - (ydata - cur_ylim[0]) * scale_factor,
+                        ydata + (cur_ylim[1] - ydata) * scale_factor]
+            ax.set_ylim(new_ylim)
 
-        new_xlim = [xdata - (xdata - cur_xlim[0]) / scale_factor,
-                    xdata + (cur_xlim[1] - xdata) / scale_factor]
-        new_ylim = [ydata - (ydata - cur_ylim[0]) / scale_factor,
-                    ydata + (cur_ylim[1] - ydata) / scale_factor]
-
-        ax.set_xlim(new_xlim)
-        ax.set_ylim(new_ylim)
-
-        self.zoom_limits[ax] = {'xlim': new_xlim, 'ylim': new_ylim}
+        self.zoom_limits[ax] = {'xlim': ax.get_xlim(), 'ylim': ax.get_ylim()}
         self.canvas.draw_idle()
-
-
-    def add_cursor(self, ax):
-        cursor = Cursor(ax, useblit=True, color='red', linewidth=1)
-        return cursor
 
     def update_graphs(self, val):
         start_channel = int(val) * self.app.channels_per_graph * 2 if self.app.compare_mode else int(val) * self.app.channels_per_graph
 
         for i in range(self.app.channels_per_graph):
             ax = self.axs[i]
-            ax.clear()  # Eski verileri temizleyelim
+            ax.clear()  # Clear old data
             if self.app.compare_mode:
                 self.plot_compare_data(ax, self.app.data, self.app.compare_channels, i, self.app.num_channels)
             else:
@@ -140,9 +141,7 @@ class GraphManager:
                     ax.set_facecolor("white")
                     ax.legend()
                     ax.grid(True)
-                else:
-                    ax.set_visible(False)
-            # Zoom limitlerini tekrar ayarlayalım
+            # Reapply zoom limits
             if ax in self.zoom_limits:
                 ax.set_xlim(self.zoom_limits[ax]['xlim'])
                 ax.set_ylim(self.zoom_limits[ax]['ylim'])
@@ -150,24 +149,30 @@ class GraphManager:
         self.fig.tight_layout()
         self.canvas.draw()
 
-
     def set_graphs_per_screen(self, value, layout='horizontal', compare=False, compare_channels=[]):
         self.app.channels_per_graph = int(value)
         self.app.compare_mode = compare
-
+    
         if self.canvas is not None:
             self.canvas.get_tk_widget().pack_forget()
             self.fig.clf()
-
+    
         self.fig, self.axs = self.create_graphs(
             self.app.data, 0, self.app.channels_per_graph, layout=layout, compare=self.app.compare_mode, compare_channels=compare_channels)
-
+    
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.canvas_frame)
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-
+    
         self.enable_zoom()
-        self.app.pagination_slider.update_pages()
+        
+        # Check if pagination_slider is initialized before using it
+        if self.app.pagination_slider:
+            self.app.pagination_slider.update_pages()
+        else:
+            print("PaginationSlider is not initialized.")
+
+
 
     def update_data_type_label(self, data_type):
         self.app.data_type_label.config(text=data_type)
@@ -208,13 +213,11 @@ class PaginationSlider(tk.Frame):
             self.slider.set(self.current_page)
             self.page_changed(None)
 
+    def page_changed(self, event):
+        self.app.graph_manager.update_graphs(self.current_page)
+
     def page_changing(self, event):
         self.current_page = int(self.slider.get())
-        self.update_dots()
-
-    def page_changed(self, event):
-        self.current_page = int(self.slider.get())
-        self.app.graph_manager.update_graphs(self.current_page)
         self.update_dots()
 
     def update_dots(self):
@@ -222,35 +225,44 @@ class PaginationSlider(tk.Frame):
             widget.destroy()
 
         for i in range(self.num_pages):
-            dot = tk.Label(self.dots_frame, text="•", font=("Arial", 14))
-            dot.pack(side=tk.LEFT)
+            dot = tk.Label(self.dots_frame, text="•", font=("Arial", 12))
+            dot.pack(side=tk.LEFT, padx=2)
+            if i == self.current_page:
+                dot.config(fg="blue")
+
+    def update_pages(self):
+        self.num_pages = (self.app.num_channels // self.app.channels_per_graph) + 1
+        self.slider.config(to=self.num_pages - 1)
+        self.update_dots()
+
+
+    def update_dots(self):
+        for widget in self.dots_frame.winfo_children():
+            widget.destroy()
+        
+        for i in range(self.num_pages):
+            dot = tk.Label(self.dots_frame, text="•", font=("Arial", 12), padx=5)
             if i == self.current_page:
                 dot.config(fg="blue")
             else:
                 dot.config(fg="gray")
-
-    def update_pages(self):
-        num_channels = self.app.num_channels
-        channels_per_graph = self.app.channels_per_graph
-        compare = self.app.compare_mode
-
-        if compare:
-            num_pages = (num_channels // (channels_per_graph * 2)) + (1 if num_channels % (channels_per_graph * 2) != 0 else 0)
-        else:
-            num_pages = (num_channels // channels_per_graph) + (1 if num_channels % channels_per_graph != 0 else 0)
-
-        self.slider.config(to=num_pages-1)
-        self.num_pages = num_pages
-        self.update_dots()
-
+            dot.pack(side=tk.LEFT)
 
 class InterfaceApplications:
     def __init__(self, root, app):
         self.root = root
         self.app = app
+        
+        # Create the widgets first
         self.create_widgets()
 
+        # Initialize PaginationSlider first
+        self.app.pagination_slider = PaginationSlider(self.root, self.app)
+        self.app.pagination_slider.pack(side=tk.TOP, fill=tk.X)
+
+        # Initialize GraphManager
         self.app.graph_manager = GraphManager(self.canvas_frame, self.app)
+        # Set up the initial state for GraphManager
         self.app.graph_manager.set_graphs_per_screen(1, layout='horizontal')
 
     def create_widgets(self):
@@ -259,41 +271,51 @@ class InterfaceApplications:
         self.menu_bar = tk.Menu(self.root)
         self.root.config(menu=self.menu_bar)
 
+        # Settings Menu
+        self.settings_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Settings", menu=self.settings_menu)
+        
+        # File Menu
         self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
         self.file_menu.add_command(label="Exit", command=self.root.quit)
-
+        
+        # View Menu
         self.view_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="View", menu=self.view_menu)
-        self.view_menu.add_command(label="Graph Layout", command=self.choose_graph_layout)
+        self.view_menu.add_command(label="Graph Layout", command=self.show_layout_buttons)
         self.view_menu.add_command(label="Graphs per Screen", command=self.choose_graphs_per_screen)
         self.view_menu.add_command(label="Compare Channels", command=self.compare_channels)
-        self.view_menu.add_command(label="Zoom In", command=self.zoom_in)
-        self.view_menu.add_command(label="Zoom Out", command=self.zoom_out)
-        self.view_menu.add_command(label="Set View Limits", command=self.set_view_limits)
-
+    
+        # Zoom Menu
+        self.zoom_menu = tk.Menu(self.settings_menu, tearoff=0)
+        self.settings_menu.add_cascade(label="Zoom", menu=self.zoom_menu)
+        # Adding Zoom commands
+        self.zoom_menu.add_command(label="Zoom In X", command=self.zoom_in_x)
+        self.zoom_menu.add_command(label="Zoom Out X", command=self.zoom_out_x)
+        self.zoom_menu.add_command(label="Zoom In Y", command=self.zoom_in_y)
+        self.zoom_menu.add_command(label="Zoom Out Y", command=self.zoom_out_y)
+        
+        # Canvas Frame
         self.canvas_frame = tk.Frame(self.root)
         self.canvas_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-        self.app.pagination_slider = PaginationSlider(self.root, self.app)
-        self.app.pagination_slider.pack(side=tk.TOP, fill=tk.X)
-
+        # Data Type Label
         self.data_type_label = tk.Label(self.root, text="Data Type", font=("Arial", 14))
         self.data_type_label.pack(side=tk.TOP)
 
-    def set_view_limits(self):
-        x_min = simpledialog.askfloat("Set X Min", "Enter minimum X value:")
-        x_max = simpledialog.askfloat("Set X Max", "Enter maximum X value:")
-        y_min = simpledialog.askfloat("Set Y Min", "Enter minimum Y value:")
-        y_max = simpledialog.askfloat("Set Y Max", "Enter maximum Y value:")
+    def show_layout_buttons(self):
+        layout_window = tk.Toplevel(self.root)
+        layout_window.title("Select Layout")
+        
+        horizontal_button = tk.Button(layout_window, text="Horizontal", command=lambda: self.set_graph_layout('horizontal'))
+        horizontal_button.pack(padx=20, pady=10)
 
-        if x_min is not None and x_max is not None and y_min is not None and y_max is not None:
-            self.app.graph_manager.set_view_limits(x_min, x_max, y_min, y_max)
+        vertical_button = tk.Button(layout_window, text="Vertical", command=lambda: self.set_graph_layout('vertical'))
+        vertical_button.pack(padx=20, pady=10)
 
-    def choose_graph_layout(self):
-        layout = simpledialog.askstring("Graph Layout", "Enter graph layout (horizontal/vertical):")
-        if layout in ["horizontal", "vertical"]:
-            self.app.graph_manager.set_graphs_per_screen(self.app.channels_per_graph, layout=layout)
+    def set_graph_layout(self, layout):
+        self.app.graph_manager.set_graphs_per_screen(self.app.channels_per_graph, layout=layout)
 
     def choose_graphs_per_screen(self):
         value = simpledialog.askinteger("Graphs per Screen", "Enter number of graphs per screen:")
@@ -306,8 +328,15 @@ class InterfaceApplications:
             compare_channels = list(map(int, channels.split(',')))
             self.app.graph_manager.set_graphs_per_screen(self.app.channels_per_graph, layout='horizontal', compare=True, compare_channels=compare_channels)
 
-    def zoom_in(self):
-        self.app.graph_manager.zoom_in()
+    def zoom_in_x(self):
+        self.app.graph_manager.zoom_in_x()
 
-    def zoom_out(self):
-        self.app.graph_manager.zoom_out()
+    def zoom_out_x(self):
+        self.app.graph_manager.zoom_out_x()
+
+    def zoom_in_y(self):
+        self.app.graph_manager.zoom_in_y()
+
+    def zoom_out_y(self):
+        self.app.graph_manager.zoom_out_y()
+
