@@ -5,7 +5,7 @@ import threading
 class DataUpdater:
     def __init__(self, update_callback, app):
         self.update_callback = update_callback
-        self.app = app  # Save the app instance
+        self.app = app  
         self.serial_port = serial.Serial('COM8', 115200, timeout=1)
         self.stop_event = threading.Event()
 
@@ -16,7 +16,7 @@ class DataUpdater:
                 values = list(map(int, line.split(',')))
                 if len(values) == self.app.num_channels:
                     new_data = np.array(values).reshape(self.app.num_channels, 1)
-                    if self.app.data.shape[1] >= 10:  # Keep the latest 10 data points
+                    if self.app.data.shape[1] >= 10:  
                         self.app.data = np.hstack((self.app.data[:, -9:], new_data))
                     else:
                         self.app.data = np.hstack((self.app.data, new_data))

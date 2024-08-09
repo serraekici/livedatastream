@@ -10,6 +10,7 @@ class GraphManager:
         self.app = app
         self.fig = None
         self.axs = []
+        
         self.zoom_limits = {}
         self.canvas = None
 
@@ -339,4 +340,3 @@ class InterfaceApplications:
 
     def zoom_out_y(self):
         self.app.graph_manager.zoom_out_y()
-
