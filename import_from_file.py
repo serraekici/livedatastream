@@ -1,0 +1,57 @@
+import pandas as pd
+import numpy as np
+import tkinter as tk
+from tkinter import filedialog, messagebox
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from singleton_decorator import singleton
+
+class SingletonMeta(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            instance = super().__call__(*args, **kwargs)
+            cls._instances[cls] = instance
+        return cls._instances[cls]
+
+class ImportFromFile(metaclass=SingletonMeta):
+    def __init__(self, root, ax, canvas):
+        self.root = root
+        self.ax = ax
+        self.canvas = canvas
+        self.data_list = []
+        self.num_channels = 10
+        self.channel_names = [f'Channel {i+1}' for i in range(self.num_channels)]
+
+    def load_data_from_file(self):
+        file_path = filedialog.askopenfilename(title="Veri Dosyasını Seçin", filetypes=[("Excel Files", "*.xlsx"), ("CSV Files", "*.csv")])
+        if file_path:
+            try:
+                if file_path.endswith('.xlsx'):
+                    df = pd.read_excel(file_path)
+                else:
+                    df = pd.read_csv(file_path)
+                self.process_data(df)
+                self.plot_static_data()
+            except Exception as e:
+                messagebox.showerror("Hata", f"Veri dosyasını yüklerken bir hata oluştu: {e}")
+
+    def process_data(self, df):
+        self.data_list.clear()
+        for _, row in df.iterrows():
+            values = row.tolist()
+            if all(isinstance(v, (int, float)) for v in values) and len(values) == self.num_channels:
+                self.data_list.append(values)
+
+    def plot_static_data(self):
+        self.ax.clear()
+        data_array = np.array(self.data_list, dtype=float)
+        for channel in range(self.num_channels):
+            self.ax.plot(data_array[:, channel], label=self.channel_names[channel], linewidth=3)
+        self.ax.set_title('Loaded Data from File', color='white')
+        self.ax.set_xlabel('Sample', color='white')
+        self.ax.set_ylabel('Value', color='white')
+        self.ax.legend(loc='upper right', facecolor='#3f3f3f')
+        self.ax.grid(True, color='#888888', linestyle='--', linewidth=0.5)
+        self.canvas.draw()
