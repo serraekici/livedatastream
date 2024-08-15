@@ -6,9 +6,11 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.animation as animation
 import time
 from serial_connection import SerialConnection
+from time_manager import TimeManager  # TimeManager'ı içeri aktarıyoruz
 
 # Global Değişkenler
 serial_conn = SerialConnection()  # Singleton instance
+time_manager = TimeManager()  # Singleton instance
 data_list = []
 selected_channels = list(range(10))  # Tüm kanalları başlangıçta seçili hale getiriyoruz
 num_channels = 10
@@ -216,11 +218,11 @@ time_label = tk.Label(appbar, text="", bg='#333', fg='white', font=("Arial", 14)
 time_label.pack(side=tk.RIGHT, padx=10)
 
 def update_time():
-    current_time = time.strftime('%Y-%m-%d %H:%M:%S')
-    time_label.config(text=current_time)
-    root.after(1000, update_time)
+    current_time = time_manager.update_time()  # Zamanı güncelle
+    time_label.config(text=current_time)  # Ekrandaki label'a yaz
+    root.after(1000, update_time)  # Bu fonksiyonu 1 saniye sonra tekrar çağır
 
-update_time()
+update_time()  # Zaman güncelleme fonksiyonunu başlat
 
 port_frame = tk.Frame(root, bg='#333')
 port_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.Y)
