@@ -8,6 +8,7 @@ from serial_connection import SerialConnection
 from time_manager import TimeManager
 from import_from_file import ImportFromFile
 from global_settings import GlobalSettings  
+from channel_activities import ChannelActivities  # Yeni dosya içe aktarılıyor
 
 # Tkinter Ana Pencere Ayarları
 root = tk.Tk()
@@ -15,9 +16,11 @@ root.title("Live Data Plotter")
 root.geometry("1200x800")
 root.configure(bg='#1c1c1c')
 
+# GlobalSettings instance
 settings = GlobalSettings()
 settings.serial_conn = SerialConnection()  # Singleton instance
 settings.time_manager = TimeManager()  # Singleton instance
+settings.channel_activities = ChannelActivities()  # Yeni ChannelActivities instance
 settings.grid_on = tk.BooleanVar(value=True)  # BooleanVar tanımı root'tan sonra yapıldı
 
 # Kullanıcıya İlk Ekranı Sunan Fonksiyon
@@ -87,16 +90,6 @@ def get_line_style():
     }
     return styles.get(line_style_combobox.get(), '-')
 
-# Kanal Seçme Fonksiyonu
-def update_selected_channels():
-    settings.selected_channels = [i for i, var in enumerate(channel_vars) if var.get() == 1]
-    update_data(None)
-
-# Kanal İsimlerini Güncelleme Fonksiyonu
-def update_channel_name(idx, event):
-    settings.channel_names[idx] = channel_entries[idx].get()
-    update_data(None)
-
 # Canlı Veri Takibi ve Güncelleme Fonksiyonları
 def update_data(frame):
     data = settings.serial_conn.read_data()
@@ -149,10 +142,6 @@ def clear_graph():
     terminal_text.delete(1.0, tk.END)
     terminal_text.config(state='disabled')
 
-def refresh_ports():
-    ports = settings.serial_conn.list_serial_ports()
-    port_combobox['values'] = ports
-
 # UI Elemanları ve Ana Çerçeveler
 appbar = tk.Frame(root, relief=tk.RAISED, bd=2, bg='#333', highlightbackground='#555', highlightthickness=1)
 appbar.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
@@ -163,12 +152,7 @@ logo.pack(side=tk.LEFT, padx=10)
 time_label = tk.Label(appbar, text="", bg='#333', fg='white', font=("Arial", 14))
 time_label.pack(side=tk.RIGHT, padx=10)
 
-def update_time():
-    current_time = settings.time_manager.update_time()  # Zamanı güncelle
-    time_label.config(text=current_time)  # Ekrandaki label'a yaz
-    root.after(1000, update_time)  # Bu fonksiyonu 1 saniye sonra tekrar çağır
-
-update_time()  # Zaman güncelleme fonksiyonunu başlat
+settings.time_manager.update_time(time_label, root)  # Zaman güncelleme fonksiyonunu başlat
 
 port_frame = tk.Frame(root, bg='#333')
 port_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.Y)
@@ -179,7 +163,7 @@ port_label.pack(pady=(10, 5))
 port_combobox = ttk.Combobox(port_frame, values=settings.serial_conn.list_serial_ports(), state="readonly")
 port_combobox.pack(fill=tk.X, pady=(0, 5))
 
-refresh_button = tk.Button(port_frame, text="Refresh COM Port List", command=refresh_ports, bg='#555', fg='white')
+refresh_button = tk.Button(port_frame, text="Refresh COM Port List", command=lambda: settings.serial_conn.refresh_ports(port_combobox), bg='#555', fg='white')
 refresh_button.pack(fill=tk.X, pady=(0, 10))
 
 baudrate_label = tk.Label(port_frame, text="Baud Rate", bg='#333', fg='white', font=("Arial", 14))
@@ -251,20 +235,20 @@ grid_switch.pack(side=tk.RIGHT, padx=10)
 channel_selection_frame = tk.Frame(root, bg='#2b2b2b')
 channel_selection_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.Y)
 
-channel_vars = []
-channel_entries = []
+settings.channel_vars = []
+settings.channel_entries = []
 for i in range(settings.num_channels):
     var = tk.IntVar()
     var.set(0) 
-    channel_vars.append(var)
-    cb = ttk.Checkbutton(channel_selection_frame, text=f"Channel {i+1}", variable=var, command=update_selected_channels)
+    settings.channel_vars.append(var)
+    cb = ttk.Checkbutton(channel_selection_frame, text=f"Channel {i+1}", variable=var, command=settings.channel_activities.update_selected_channels)
     cb.pack(anchor='w')
 
     entry = tk.Entry(channel_selection_frame, width=15)
     entry.insert(0, settings.channel_names[i])
     entry.pack(padx=5, pady=2)
-    entry.bind("<KeyRelease>", lambda event, idx=i: update_channel_name(idx, event))
-    channel_entries.append(entry)
+    entry.bind("<KeyRelease>", lambda event, idx=i: settings.channel_activities.update_channel_name(idx, event))
+    settings.channel_entries.append(entry)
 
 ani = animation.FuncAnimation(fig, update_data, interval=1000, cache_frame_data=False)
 

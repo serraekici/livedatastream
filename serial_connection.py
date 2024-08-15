@@ -47,6 +47,10 @@ class SerialConnection:
         ports = serial.tools.list_ports.comports()
         return [port.device for port in ports]
 
+    def refresh_ports(self, port_combobox):
+        ports = self.list_serial_ports()
+        port_combobox['values'] = ports
+
     def animate_connection_indicator(self, connection_indicator, indicator_circle, root):
         current_color = connection_indicator.itemcget(indicator_circle, "fill")
         next_color = 'green' if current_color == 'red' else 'red'

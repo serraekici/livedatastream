@@ -9,9 +9,12 @@ class TimeManager:
         return cls._instance
 
     def __init__(self):
-        if not hasattr(self, 'current_time'):
-            self.current_time = ""
+        pass
 
-    def update_time(self):
-        self.current_time = time.strftime('%Y-%m-%d %H:%M:%S')
-        return self.current_time
+    def get_current_time(self):
+        return time.strftime('%Y-%m-%d %H:%M:%S')
+
+    def update_time(self, time_label, root):
+        current_time = self.get_current_time()
+        time_label.config(text=current_time)
+        root.after(1000, lambda: self.update_time(time_label, root))
