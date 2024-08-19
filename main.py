@@ -8,7 +8,8 @@ from serial_connection import SerialConnection
 from time_manager import TimeManager
 from import_from_file import ImportFromFile
 from global_settings import GlobalSettings  
-from channel_activities import ChannelActivities  # Yeni dosya içe aktarılıyor
+from channel_activities import ChannelActivities  
+from show_startup_screen import ShowStartupScreenSingleton
 
 # Tkinter Ana Pencere Ayarları
 root = tk.Tk()
@@ -18,57 +19,43 @@ root.configure(bg='#1c1c1c')
 
 # GlobalSettings instance
 settings = GlobalSettings()
-settings.serial_conn = SerialConnection()  # Singleton instance
-settings.time_manager = TimeManager()  # Singleton instance
-settings.channel_activities = ChannelActivities()  # Yeni ChannelActivities instance
-settings.grid_on = tk.BooleanVar(value=True)  # BooleanVar tanımı root'tan sonra yapıldı
+settings.serial_conn = SerialConnection()  
+settings.time_manager = TimeManager()  
+settings.channel_activities = ChannelActivities(settings)  
+settings.grid_on = tk.BooleanVar(value=True)
 
-# Kullanıcıya İlk Ekranı Sunan Fonksiyon
-def show_startup_screen():
-    startup_screen = tk.Frame(root, bg='#2b2b2b')
-    startup_screen.pack(expand=True, fill=tk.BOTH)
+# Tüm çerçeveleri ana pencerede tutmak için
+frame_holder = {}
 
-    welcome_label = tk.Label(startup_screen, text="Welcome", font=("Arial", 24), fg='white', bg='#2b2b2b')
-    welcome_label.pack(pady=(40, 20))
+def show_frame(name):
+    for frame in frame_holder.values():
+        frame.pack_forget()
+    frame_holder[name].pack(expand=True, fill=tk.BOTH)
 
-    subtext_label = tk.Label(startup_screen, text="How Can We Help You?", font=("Arial", 12), fg='#bbbbbb', bg='#2b2b2b')
-    subtext_label.pack(pady=(0, 40))
+def start_application():
+    startup_screen = ShowStartupScreenSingleton(root, start_from_file, start_from_serial)
+    startup_screen.show_startup_screen()  # Burada startup_screen'in ekranını başlatıyoruz
+    frame_holder["startup"] = startup_screen.startup_screen
+    frame_holder["startup"].pack(expand=True, fill=tk.BOTH)
 
-    options_frame = tk.Frame(startup_screen, bg='#2b2b2b')
-    options_frame.pack(pady=20)
+def start_from_file():
+    frame_holder["startup"].pack_forget()
 
-    file_frame = tk.Frame(options_frame, bg='#333', bd=2, relief=tk.RAISED)
-    file_frame.pack(side=tk.LEFT, padx=20, pady=10, fill=tk.BOTH, expand=True)
-
-    serial_frame = tk.Frame(options_frame, bg='#333', bd=2, relief=tk.RAISED)
-    serial_frame.pack(side=tk.RIGHT, padx=20, pady=10, fill=tk.BOTH, expand=True)
-
-    file_label = tk.Label(file_frame, text="📂", font=("Arial", 64), bg='#333', fg='#5e97f6')
-    file_label.pack(pady=(10, 10))
-
-    file_text = tk.Label(file_frame, text="Dosyadan Aktarım", font=("Arial", 14), fg='white', bg='#333')
-    file_text.pack()
-
-    serial_label = tk.Label(serial_frame, text="🔌", font=("Arial", 64), bg='#333', fg='#9c27b0')
-    serial_label.pack(pady=(10, 10))
-
-    serial_text = tk.Label(serial_frame, text="USB Serial Device", font=("Arial", 14), fg='white', bg='#333')
-    serial_text.pack()
-
-    file_frame.bind("<Button-1>", lambda e: start_from_file(startup_screen))
-    serial_frame.bind("<Button-1>", lambda e: start_from_serial(startup_screen))
-
-def start_from_file(startup_screen):
-    startup_screen.pack_forget()
     import_from_file = ImportFromFile(root, ax, canvas)
     import_from_file.load_data_from_file()
+
     port_frame.pack_forget()
     connect_frame.pack_forget()
-    show_graph()
+    channel_selection_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.Y)  
+    show_frame("graph")
 
-def start_from_serial(startup_screen):
-    startup_screen.pack_forget()
-    show_graph()
+def start_from_serial():
+    frame_holder["startup"].pack_forget()
+
+    port_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.Y)
+    connect_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.Y)
+    channel_selection_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.Y)  
+    show_frame("graph")
 
 # Matplotlib Grafiği Kurma
 fig, ax = plt.subplots(facecolor='#2b2b2b')
@@ -77,10 +64,8 @@ ax.grid(True, color='#888888', linestyle='--', linewidth=0.5)
 
 canvas = FigureCanvasTkAgg(fig, master=root)
 
-def show_graph():
-    canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+frame_holder["graph"] = canvas.get_tk_widget()
 
-# Stil Seçme Fonksiyonu
 def get_line_style():
     styles = {
         'Solid': '-',
@@ -90,7 +75,6 @@ def get_line_style():
     }
     return styles.get(line_style_combobox.get(), '-')
 
-# Canlı Veri Takibi ve Güncelleme Fonksiyonları
 def update_data(frame):
     data = settings.serial_conn.read_data()
     if data:
@@ -152,7 +136,7 @@ logo.pack(side=tk.LEFT, padx=10)
 time_label = tk.Label(appbar, text="", bg='#333', fg='white', font=("Arial", 14))
 time_label.pack(side=tk.RIGHT, padx=10)
 
-settings.time_manager.update_time(time_label, root)  # Zaman güncelleme fonksiyonunu başlat
+settings.time_manager.update_time(time_label, root)
 
 port_frame = tk.Frame(root, bg='#333')
 port_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.Y)
@@ -211,7 +195,6 @@ x_end_entry = tk.Entry(xy_control_frame, width=5)
 x_end_entry.pack(side=tk.LEFT, padx=5)
 
 y_start_label = tk.Label(xy_control_frame, text="Y Start:", bg='#333', fg='white')
-y_start_label.pack(side=tk.LEFT, padx=5)
 y_start_entry = tk.Entry(xy_control_frame, width=5)
 y_start_entry.pack(side=tk.LEFT, padx=5)
 
@@ -238,8 +221,7 @@ channel_selection_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.Y)
 settings.channel_vars = []
 settings.channel_entries = []
 for i in range(settings.num_channels):
-    var = tk.IntVar()
-    var.set(0) 
+    var = tk.IntVar(value=0)
     settings.channel_vars.append(var)
     cb = ttk.Checkbutton(channel_selection_frame, text=f"Channel {i+1}", variable=var, command=settings.channel_activities.update_selected_channels)
     cb.pack(anchor='w')
@@ -250,16 +232,8 @@ for i in range(settings.num_channels):
     entry.bind("<KeyRelease>", lambda event, idx=i: settings.channel_activities.update_channel_name(idx, event))
     settings.channel_entries.append(entry)
 
-ani = animation.FuncAnimation(fig, update_data, interval=1000, cache_frame_data=False)
+ani = animation.FuncAnimation(fig, update_data, interval=1, cache_frame_data=False)
 
-# Başlangıç Ekranını Göster
-show_startup_screen()
-
-# Ana Döngü
-try:
+if __name__ == "__main__":
+    start_application()
     root.mainloop()
-except KeyboardInterrupt:
-    print("Exiting...")
-finally:
-    if settings.serial_conn.ser.is_open:
-        settings.serial_conn.ser.close()

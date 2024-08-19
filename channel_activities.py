@@ -1,8 +1,8 @@
 from global_settings import GlobalSettings
 
 class ChannelActivities:
-    def __init__(self):
-        self.settings = GlobalSettings()
+    def __init__(self, settings):
+        self.settings = settings
 
     def update_selected_channels(self):
         self.settings.selected_channels = [i for i, var in enumerate(self.settings.channel_vars) if var.get() == 1]

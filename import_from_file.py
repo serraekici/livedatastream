@@ -2,20 +2,8 @@ import pandas as pd
 import numpy as np
 import tkinter as tk
 from tkinter import filedialog, messagebox
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from singleton_decorator import singleton
 
-class SingletonMeta(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            instance = super().__call__(*args, **kwargs)
-            cls._instances[cls] = instance
-        return cls._instances[cls]
-
-class ImportFromFile(metaclass=SingletonMeta):
+class ImportFromFile:
     def __init__(self, root, ax, canvas):
         self.root = root
         self.ax = ax
