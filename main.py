@@ -10,6 +10,7 @@ from import_from_file import ImportFromFile
 from global_settings import GlobalSettings  
 from channel_activities import ChannelActivities  
 from show_startup_screen import ShowStartupScreenSingleton
+from line_style import LineStyle
 
 # Tkinter Ana Pencere Ayarları
 root = tk.Tk()
@@ -23,108 +24,6 @@ settings.serial_conn = SerialConnection()
 settings.time_manager = TimeManager()  
 settings.channel_activities = ChannelActivities(settings)  
 settings.grid_on = tk.BooleanVar(value=True)
-
-# Tüm çerçeveleri ana pencerede tutmak için
-frame_holder = {}
-
-def show_frame(name):
-    for frame in frame_holder.values():
-        frame.pack_forget()
-    frame_holder[name].pack(expand=True, fill=tk.BOTH)
-
-def start_application():
-    startup_screen = ShowStartupScreenSingleton(root, start_from_file, start_from_serial)
-    startup_screen.show_startup_screen()  # Burada startup_screen'in ekranını başlatıyoruz
-    frame_holder["startup"] = startup_screen.startup_screen
-    frame_holder["startup"].pack(expand=True, fill=tk.BOTH)
-
-def start_from_file():
-    frame_holder["startup"].pack_forget()
-
-    import_from_file = ImportFromFile(root, ax, canvas)
-    import_from_file.load_data_from_file()
-
-    port_frame.pack_forget()
-    connect_frame.pack_forget()
-    channel_selection_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.Y)  
-    show_frame("graph")
-
-def start_from_serial():
-    frame_holder["startup"].pack_forget()
-
-    port_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.Y)
-    connect_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.Y)
-    channel_selection_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.Y)  
-    show_frame("graph")
-
-# Matplotlib Grafiği Kurma
-fig, ax = plt.subplots(facecolor='#2b2b2b')
-ax.set_facecolor('#abab9a')
-ax.grid(True, color='#888888', linestyle='--', linewidth=0.5)
-
-canvas = FigureCanvasTkAgg(fig, master=root)
-
-frame_holder["graph"] = canvas.get_tk_widget()
-
-def get_line_style():
-    styles = {
-        'Solid': '-',
-        'Dashed': '--',
-        'Dotted': ':',
-        'Dashdot': '-.'
-    }
-    return styles.get(line_style_combobox.get(), '-')
-
-def update_data(frame):
-    data = settings.serial_conn.read_data()
-    if data:
-        values = data.split(',')
-        if all(v.replace('.', '', 1).isdigit() for v in values) and len(values) == settings.num_channels:
-            settings.data_list.append([float(v) for v in values])
-            update_terminal(data)
-
-        if settings.data_list:
-            data_array = np.array(settings.data_list, dtype=float)
-            ax.clear()
-            line_style = get_line_style()
-            for channel in settings.selected_channels:
-                ax.plot(data_array[:, channel], label=settings.channel_names[channel], linestyle=line_style, linewidth=3)
-            ax.set_title('Selected Channels', color='white')
-            ax.set_xlabel('Sample', color='white')
-            ax.set_ylabel('Value', color='white')
-            ax.legend(loc='upper right', facecolor='#3f3f3f')
-            ax.grid(settings.grid_on.get(), color='#888888', linestyle='--', linewidth=0.5)
-
-            try:
-                ax.set_xlim([int(x_start_entry.get()), int(x_end_entry.get())])
-            except ValueError:
-                pass
-
-            try:
-                ax.set_ylim([int(y_start_entry.get()), int(y_end_entry.get())])
-            except ValueError:
-                pass
-
-            canvas.draw()
-
-def update_terminal(data):
-    terminal_text.config(state='normal')
-    terminal_text.insert(tk.END, f"Data: {data}\n")
-    terminal_text.see(tk.END)
-    terminal_text.config(state='disabled')
-
-def clear_graph():
-    settings.data_list.clear()
-    ax.clear()
-    ax.set_title('Selected Channels', color='white')
-    ax.set_xlabel('Sample', color='white')
-    ax.set_ylabel('Value', color='white')
-    ax.grid(settings.grid_on.get(), color='#888888', linestyle='--', linewidth=0.5)
-    canvas.draw()
-
-    terminal_text.config(state='normal')
-    terminal_text.delete(1.0, tk.END)
-    terminal_text.config(state='disabled')
 
 # UI Elemanları ve Ana Çerçeveler
 appbar = tk.Frame(root, relief=tk.RAISED, bd=2, bg='#333', highlightbackground='#555', highlightthickness=1)
@@ -209,7 +108,7 @@ line_style_combobox = ttk.Combobox(xy_control_frame, values=['Solid', 'Dashed', 
 line_style_combobox.current(0)
 line_style_combobox.pack(side=tk.LEFT, padx=5)
 
-clear_button = tk.Button(xy_control_frame, text="Clear Graph", bg='#456', fg='white', command=clear_graph)
+clear_button = tk.Button(xy_control_frame, text="Clear Graph", bg='#456', fg='white', command=lambda: clear_graph())
 clear_button.pack(side=tk.RIGHT, padx=10)
 
 grid_switch = ttk.Checkbutton(xy_control_frame, text="Grid On/Off", variable=settings.grid_on, command=lambda: update_data(None))
@@ -231,6 +130,101 @@ for i in range(settings.num_channels):
     entry.pack(padx=5, pady=2)
     entry.bind("<KeyRelease>", lambda event, idx=i: settings.channel_activities.update_channel_name(idx, event))
     settings.channel_entries.append(entry)
+
+# GlobalSettings'e LineStyle instance'ını ekleyelim
+settings.line_style = LineStyle(line_style_combobox)
+
+# Tüm çerçeveleri ana pencerede tutmak için
+frame_holder = {}
+
+def show_frame(name):
+    for frame in frame_holder.values():
+        frame.pack_forget()
+    frame_holder[name].pack(expand=True, fill=tk.BOTH)
+
+def start_application():
+    startup_screen = ShowStartupScreenSingleton(root, start_from_file, start_from_serial)
+    startup_screen.show_startup_screen()
+    frame_holder["startup"] = startup_screen.startup_screen
+    frame_holder["startup"].pack(expand=True, fill=tk.BOTH)
+
+def start_from_file():
+    frame_holder["startup"].pack_forget()
+
+    import_from_file = ImportFromFile(root, ax, canvas)
+    import_from_file.load_data_from_file()
+
+    port_frame.pack_forget()
+    connect_frame.pack_forget()
+    channel_selection_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.Y)  
+    show_frame("graph")
+
+def start_from_serial():
+    frame_holder["startup"].pack_forget()
+
+    port_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.Y)
+    connect_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.Y)
+    channel_selection_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.Y)  
+    show_frame("graph")
+
+# Matplotlib Grafiği Kurma
+fig, ax = plt.subplots(facecolor='#2b2b2b')
+ax.set_facecolor('#abab9a')
+ax.grid(True, color='#888888', linestyle='--', linewidth=0.5)
+
+canvas = FigureCanvasTkAgg(fig, master=root)
+frame_holder["graph"] = canvas.get_tk_widget()
+
+def update_data(frame):
+    data = settings.serial_conn.read_data()
+    if data:
+        values = data.split(',')
+        if all(v.replace('.', '', 1).isdigit() for v in values) and len(values) == settings.num_channels:
+            settings.data_list.append([float(v) for v in values])
+            update_terminal(data)
+
+        if settings.data_list:
+            data_array = np.array(settings.data_list, dtype=float)
+            ax.clear()
+            line_style = settings.line_style.get_line_style()
+            for channel in settings.selected_channels:
+                ax.plot(data_array[:, channel], label=settings.channel_names[channel], linestyle=line_style, linewidth=3)
+            ax.set_title('Selected Channels', color='white')
+            ax.set_xlabel('Sample', color='white')
+            ax.set_ylabel('Value', color='white')
+            ax.legend(loc='upper right', facecolor='#3f3f3f')
+            ax.grid(settings.grid_on.get(), color='#888888', linestyle='--', linewidth=0.5)
+
+            try:
+                ax.set_xlim([int(x_start_entry.get()), int(x_end_entry.get())])
+            except ValueError:
+                pass
+
+            try:
+                ax.set_ylim([int(y_start_entry.get()), int(y_end_entry.get())])
+            except ValueError:
+                pass
+
+            canvas.draw()
+
+def update_terminal(data):
+    terminal_text.config(state='normal')
+    terminal_text.insert(tk.END, f"Data: {data}\n")
+    terminal_text.see(tk.END)
+    terminal_text.config(state='disabled')
+
+def clear_graph():
+    settings.data_list.clear()
+    ax.clear()
+    ax.set_title('Selected Channels', color='white')
+    ax.set_xlabel('Sample', color='white')
+    ax.set_ylabel('Value', color='white')
+    ax.grid(settings.grid_on.get(), color='#888888', linestyle='--', linewidth=0.5)
+    canvas.draw()
+
+    terminal_text.config(state='normal')
+    terminal_text.delete(1.0, tk.END)
+    terminal_text.config(state='disabled')
 
 ani = animation.FuncAnimation(fig, update_data, interval=1, cache_frame_data=False)
 
