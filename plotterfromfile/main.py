@@ -34,7 +34,6 @@ class ImportFromFile:
             values = row.tolist()
             if all(isinstance(v, (int, float)) for v in values) and len(values) == self.num_channels:
                 self.data_list.append(values)
-
     def plot_static_data(self):
         self.ax.clear()
         data_array = np.array(self.data_list, dtype=float)
@@ -71,4 +70,4 @@ def main():
     root.mainloop()
 
 if __name__ == "__main__":
-    main()
+    ImportFromFile()

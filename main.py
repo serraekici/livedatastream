@@ -4,21 +4,18 @@ import os
 import sys
 
 def open_red_screen(root):
-    root.destroy()  # Seçim sayfasını kapat
-    process = subprocess.Popen([sys.executable, os.path.join("plotterfromfile", "main.py")])
-    process.wait()  # İkinci sayfa kapanana kadar bekle
-    create_interface()  # İkinci sayfa kapandıktan sonra seçim sayfasını yeniden aç
+    root.destroy()  # Close the selection screen
+    subprocess.run([sys.executable, os.path.join("plotterfromfile", "main.py")])  # Open the red screen
 
 def open_black_screen(root):
-    root.destroy()  # Seçim sayfasını kapat
-    process = subprocess.Popen([sys.executable, os.path.join("plotterfromserial", "main.py")])
-    process.wait()  # İkinci sayfa kapanana kadar bekle
-    create_interface()  # İkinci sayfa kapandıktan sonra seçim sayfasını yeniden aç
+    root.destroy()  # Close the selection screen
+    subprocess.run([sys.executable, os.path.join("plotterfromserial", "main.py")])  # Open the black screen
 
 def create_interface():
     root = tk.Tk()
     root.title("Live Data Plotter")
     root.geometry("1200x800")
+    root.configure(bg='#2b2b2b')
 
     tk.Label(root, text="Welcome", font=("Arial", 18, "bold"), fg='white', bg='#2b2b2b').pack(pady=20)
 
