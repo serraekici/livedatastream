@@ -1,4 +1,3 @@
-# serial_connection.py
 import serial
 from tkinter import messagebox
 
@@ -14,25 +13,28 @@ class SerialConnection:
         if not hasattr(self, 'ser'):
             self.ser = None
 
-    def connect_to_port(self, connection_status, connection_indicator, indicator_circle, root):
+    def connect_to_port(self, connection_indicator, indicator_circle, connection_status, root):
         try:
-            if self.ser and self.ser.is_open:
-                self.ser.close()
-            # Seri portu COM8 ve baudrate'i 115200 olarak ayarlıyoruz, timeout'u 5 saniye yapıyoruz
-            self.ser = serial.Serial('COM8', baudrate=115200, timeout=5)
-            # Bağlantı durumu ile ilgili mesajları devre dışı bırakıyoruz
-            if connection_status:
+            self.ser = serial.Serial(
+                port='COM8',  # Ensure this is the correct COM port
+                baudrate=115200,  # Ensure this matches the baud rate of the sending device
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                bytesize=serial.EIGHTBITS,
+                timeout=1
+            )
+            if self.ser.is_open:
+                print("Serial port is open.")
                 connection_status.config(text="Connected", fg='green')
-            if connection_indicator and indicator_circle:
                 connection_indicator.itemconfig(indicator_circle, fill='green')
-            messagebox.showinfo("Bağlantı Başarıyla Kuruldu", "Connected to COM8 at baudrate 115200")
+            else:
+                print("Failed to open serial port.")
         except serial.SerialException as e:
-            if connection_status:
-                connection_status.config(text="Disconnected", fg='red')
-            if connection_indicator and indicator_circle:
-                connection_indicator.itemconfig(indicator_circle, fill='red')
+            connection_status.config(text="Disconnected", fg='red')
+            connection_indicator.itemconfig(indicator_circle, fill='red')
             root.after(500, lambda: self.animate_connection_indicator(connection_indicator, indicator_circle, root))
-            messagebox.showerror("Bağlantı Hatası", f"Failed to connect to COM8: {e}")
+            print(f"Failed to connect to port: {e}")
+
 
     def disconnect_from_port(self, connection_status, connection_indicator, indicator_circle, root):
         if self.ser and self.ser.is_open:
@@ -47,13 +49,12 @@ class SerialConnection:
             messagebox.showerror("Hata", "No open serial connection to close.")
 
     def read_data(self):
-        if self.ser and self.ser.is_open:
-            if self.ser.in_waiting > 0:
-                data = self.ser.readline().decode('utf-8').strip()
-                print(f"Seriden gelen veri: {data}")
-                return data
-            else:
-                print("Seri porttan veri bekleniyor...")
+        if self.ser and self.ser.is_open and self.ser.in_waiting > 0:
+            data = self.ser.readline().decode('utf-8').strip()
+            print(f"Received data: {data}")  # Debug print to verify data reception
+            return data
+        else:
+            print("No data available to read or connection not open.")
         return None
 
     def animate_connection_indicator(self, connection_indicator, indicator_circle, root):

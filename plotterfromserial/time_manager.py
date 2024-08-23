@@ -5,7 +5,7 @@ import datetime
 class TimeDisplay:
     def __init__(self, root, **kwargs):
         self.time_label = tk.Label(root, **kwargs)
-        self.time_label.pack(anchor='ne', padx=10, pady=10)
+        self.time_label.pack(anchor='ne', padx=4, pady=1)
         self.update_time()
 
     def update_time(self):
