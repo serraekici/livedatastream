@@ -44,7 +44,7 @@ class ImportFromSerial:
         left_frame = tk.Frame(main_frame, bg='#333', width=150)
         left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
 
-        # Right sidebar for channel selection
+        # Right sidebar for channel selection and graph control
         right_frame = tk.Frame(main_frame, bg='#333', width=200)
         right_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=10, pady=10)
 
@@ -68,11 +68,23 @@ class ImportFromSerial:
         self.baudrate_combobox = ttk.Combobox(left_frame, values=[1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, 115200, 230400], state="readonly", width=10)
         self.baudrate_combobox.current(9)
         self.baudrate_combobox.pack(fill=tk.X, pady=(0, 5))
-
-        connect_button = tk.Button(left_frame, text="Connect", bg='#456', fg='pink', width=8, command=self.connect_to_port)
+        
+        connect_button = tk.Button(left_frame, text="Connect", bg='#456', fg='pink', width=8, 
+                                   command=lambda: self.serial_conn.connect_to_port(
+                                       self.port_combobox.get(),
+                                       self.baudrate_combobox.get(),
+                                       self.connection_status,
+                                       self.connection_indicator,
+                                       self.indicator_circle,
+                                       self.root))
         connect_button.pack(fill=tk.X, pady=(5, 5))
 
-        disconnect_button = tk.Button(left_frame, text="Disconnect", bg='#456', fg='pink', width=8, command=self.disconnect_from_port)
+        disconnect_button = tk.Button(left_frame, text="Disconnect", bg='#456', fg='pink', width=8,
+                                      command=lambda: self.serial_conn.disconnect_from_port(
+                                          self.connection_status,
+                                          self.connection_indicator,
+                                          self.indicator_circle,
+                                          self.root))
         disconnect_button.pack(fill=tk.X, pady=(5, 5))
 
         # Connection Status Indicator
@@ -87,8 +99,8 @@ class ImportFromSerial:
         tk.Label(right_frame, text="Select Channels:", bg='#333', fg='pink', font=("Arial", 14)).pack(anchor='w', pady=(10, 5))
 
         for idx, name in enumerate(self.channel_names):
-            channel_check = tk.Checkbutton(right_frame, text=name, variable=self.channel_vars[idx], bg='#333', fg='white', 
-                                           selectcolor='purple', command=self.channel_activities.update_selected_channels)
+            channel_check = tk.Checkbutton(right_frame, text=name, variable=self.channel_vars[idx], bg='#333', fg='pink', 
+                                           selectcolor='blue', command=self.channel_activities.update_selected_channels)
             channel_check.pack(anchor='w', padx=10)
             entry = tk.Entry(right_frame, width=15)
             entry.insert(0, name)
@@ -120,12 +132,16 @@ class ImportFromSerial:
         self.y_end_entry = tk.Entry(xy_control_frame, width=5)
         self.y_end_entry.pack(side=tk.LEFT, padx=5)
 
+        # Clear Graph Button
+        clear_button = tk.Button(right_frame, text="Clear Graph", bg='#555', fg='pink', width=15,height=5, command=self.clear_graph)
+        clear_button.pack(anchor='w', pady=(10, 1))
+
         # Initialize serial port
         self.serial_conn.refresh_ports(self.port_combobox)
 
         # Create the graph in the graph frame
-        self.fig = Figure(figsize=(8, 6), dpi=100)
-        self.ax = self.fig.add_subplot(111)
+        self.fig = Figure(figsize=(8, 6), dpi=100, facecolor='#2f2f2f')  # Set the figure background color to gray
+        self.ax = self.fig.add_subplot(111, facecolor='#3f3f3f')  # Set the axes background color to a slightly darker gray
         self.ax.grid(True, color='gray', linestyle='--', linewidth=0.5)  # Adding a dark gray grid
         self.canvas = FigureCanvasTkAgg(self.fig, master=graph_frame)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
@@ -134,24 +150,6 @@ class ImportFromSerial:
         self.ani = animation.FuncAnimation(self.fig, self.update_data, interval=1, cache_frame_data=False)
 
         self.root.mainloop()
-
-    def connect_to_port(self):
-        self.serial_conn.connect_to_port(
-            self.port_combobox.get(),
-            self.baudrate_combobox.get(),
-            self.connection_status,
-            self.connection_indicator,
-            self.indicator_circle,
-            self.root
-        )
-
-    def disconnect_from_port(self):
-        self.serial_conn.disconnect_from_port(
-            self.connection_status,
-            self.connection_indicator,
-            self.indicator_circle,
-            self.root
-        )
 
     def update_data(self, frame=None):
         data = self.serial_conn.read_data()
@@ -188,6 +186,13 @@ class ImportFromSerial:
                     pass  # Ignore if the input is not a valid integer
 
                 self.canvas.draw()
+
+    def clear_graph(self):
+        """Clear the graph and reset the data list."""
+        self.data_list.clear()
+        self.ax.clear()
+        self.ax.grid(True, color='gray', linestyle='--', linewidth=1)  # Re-add the grid after clearing
+        self.canvas.draw()
 
 if __name__ == "__main__":
     root = tk.Tk()

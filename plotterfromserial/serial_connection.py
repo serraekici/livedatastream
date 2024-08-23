@@ -40,7 +40,7 @@ class SerialConnection:
             connection_status.config(text="Disconnected", fg='red')
             connection_indicator.itemconfig(indicator_circle, fill='red')
             root.after(500, lambda: self.animate_connection_indicator(connection_indicator, indicator_circle, root))
-            print(f"Failed to connect to port: {e}")
+            messagebox.showerror("Error", f"Failed to connect to port: {e}")
 
     def disconnect_from_port(self, connection_status, connection_indicator, indicator_circle, root):
         if self.ser and self.ser.is_open:
@@ -53,13 +53,17 @@ class SerialConnection:
             messagebox.showerror("Error", "No open serial connection to close.")
 
     def read_data(self):
-        if self.ser and self.ser.is_open and self.ser.in_waiting > 0:
-            data = self.ser.readline().decode('utf-8').strip()
-            print(f"Received data: {data}")
-            return data
-        else:
-            print("No data available to read or connection not open.")
-        return None
+        try:
+            if self.ser and self.ser.is_open and self.ser.in_waiting > 0:
+                data = self.ser.readline().decode('utf-8').strip()
+                print(f"Received data: {data}")
+                return data
+            else:
+                print("No data available to read or connection not open.")
+        except serial.SerialException as e:
+            messagebox.showerror("Error", "Disconnected from port.")
+            self.ser = None  # Invalidate the connection
+            return None
 
     def list_serial_ports(self):
         ports = serial.tools.list_ports.comports()

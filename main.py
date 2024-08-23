@@ -19,8 +19,8 @@ def create_interface():
 
     tk.Label(root, text="Welcome", font=("Arial", 18, "bold"), fg='white', bg='#2b2b2b').pack(pady=20)
 
-    tk.Button(root, text="Open Red Screen", command=lambda: open_red_screen(root), bg='red', fg='white').pack(pady=10)
-    tk.Button(root, text="Open Black Screen", command=lambda: open_black_screen(root), bg='black', fg='white').pack(pady=10)
+    tk.Button(root, text="IMPORT FROM FILE", command=lambda: open_red_screen(root), bg='red', fg='white').pack(pady=10)
+    tk.Button(root, text="USB SERIAL DEVICE", command=lambda: open_black_screen(root), bg='black', fg='white').pack(pady=10)
 
     root.mainloop()
 
