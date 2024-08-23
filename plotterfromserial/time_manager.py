@@ -1,10 +1,10 @@
-
 import tkinter as tk
 import datetime
 
 class TimeDisplay:
-    def __init__(self, root, **kwargs):
-        self.time_label = tk.Label(root, **kwargs)
+    def __init__(self, parent, **kwargs):
+        super().__init__()
+        self.time_label = tk.Label(parent, **kwargs)  # Use `parent` instead of `root`
         self.time_label.pack(anchor='ne', padx=4, pady=1)
         self.update_time()
 
