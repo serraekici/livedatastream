@@ -52,18 +52,25 @@ class SerialConnection:
         else:
             messagebox.showerror("Error", "No open serial connection to close.")
 
-    def read_data(self):
-        try:
-            if self.ser and self.ser.is_open and self.ser.in_waiting > 0:
-                data = self.ser.readline().decode('utf-8').strip()
-                print(f"Received data: {data}")
-                return data
-            else:
-                print("No data available to read or connection not open.")
-        except serial.SerialException as e:
-            messagebox.showerror("Error", "Disconnected from port.")
-            self.ser = None  # Invalidate the connection
-            return None
+    def read_serial_data(self, terminal, data_list, update_graph, root):
+        """Continuously read data from the serial port and update the graph."""
+        if self.ser and self.ser.is_open:
+            if self.ser.in_waiting > 0:  # Only read if there is data available
+                try:
+                    data = self.ser.readline().decode('utf-8').strip()  # Read and decode the data
+                    if data:
+                        print(f"Received data: {data}")  # Debugging: Print the data to the console
+                        terminal.insert('end', f"{data}\n")  # Insert the data into the terminal
+                        terminal.see('end')  # Scroll to the end to show the latest data
+                        values = data.split(',')
+                        if all(v.replace('.', '', 1).isdigit() for v in values):
+                            float_values = [float(v) for v in values]
+                            data_list.append(float_values)
+                            print(f"Processed data: {float_values}")  # Debugging: Show processed data
+                            update_graph()  # Update the graph immediately after receiving data
+                except serial.SerialException as e:
+                    print(f"Error reading data: {e}")
+        root.after(100, lambda: self.read_serial_data(terminal, data_list, update_graph, root))
 
     def list_serial_ports(self):
         ports = serial.tools.list_ports.comports()
