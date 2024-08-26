@@ -3,7 +3,7 @@ from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import numpy as np
+import pandas as pd
 from serial_connection import SerialConnection
 from time_manager import TimeDisplay
 from channel_activities import ChannelActivities
@@ -17,8 +17,9 @@ class ImportFromSerial:
         self.root.configure(bg='#1c1c1c')
 
         self.serial_conn = SerialConnection()
-        self.channel_activities = ChannelActivities(self)
+        self.channel_activities = ChannelActivities()
         self.data_list = []
+        self.average_active = False  # To track if the average feature is active
 
         # Updated to handle 10 channels
         self.selected_channels = []
@@ -127,11 +128,20 @@ class ImportFromSerial:
         self.terminal.pack(fill=tk.BOTH, expand=True)
 
         # Setup Channel Controls in the right sidebar using ChannelActivities
-        self.channel_activities.setup_channel_controls(right_frame)
+        self.setup_channel_controls(right_frame)
 
         # Clear Graph Button at the bottom of the right frame
         clear_button = tk.Button(right_frame, text="Clear Graph", bg='#555', fg='pink', command=self.clear_graph, height=2)
         clear_button.pack(side=tk.BOTTOM, pady=10)
+
+        # Average Calculation Controls
+        average_label = tk.Label(right_frame, text="Average of N Channels:", bg='#333', fg='pink', font=("Arial", 12))
+        average_label.pack(anchor='w', pady=(10, 5))
+        self.average_entry = tk.Entry(right_frame, width=10)
+        self.average_entry.pack(anchor='w', pady=(5, 5))
+
+        calculate_button = tk.Button(right_frame, text="Calculate and Plot", bg='#456', fg='pink', command=self.calculate_and_plot_average)
+        calculate_button.pack(anchor='w', pady=(5, 10))
 
         # Initialize serial port
         self.serial_conn.refresh_ports(self.port_combobox)
@@ -148,24 +158,52 @@ class ImportFromSerial:
 
         self.root.mainloop()
 
-    def update_graph(self):
-        """Update the graph based on the latest data."""
-        if self.data_list:
-            data_array = np.array(self.data_list, dtype=float)
+    def setup_channel_controls(self, parent_frame):
+        """Setup the channel selection controls in the given frame."""
+        channel_label = tk.Label(parent_frame, text="Select Channels:", bg='#333', fg='pink', font=("Arial", 14))
+        channel_label.pack(anchor='w', pady=(10, 5))
+
+        for idx, channel_name in enumerate(self.channel_names):
+            checkbox = tk.Checkbutton(parent_frame, text=channel_name, variable=self.channel_vars[idx], bg='#333', fg='pink', font=("Arial", 12))
+            checkbox.pack(anchor='w', padx=5, pady=2)
+            self.channel_entries.append(checkbox)
+
+    def calculate_and_plot_average(self):
+        """Calculate the average of the first N channels and plot it with a selected channel."""
+        try:
+            last_n_channels = int(self.average_entry.get())
+            if last_n_channels <= 1 or last_n_channels > 10:
+                raise ValueError("The number of channels must be between 2 and 10.")
+
+            selected_channel_index = [i for i, var in enumerate(self.channel_vars) if var.get()]
+            if len(selected_channel_index) != 1:
+                raise ValueError("Please select exactly one channel to compare with the average.")
+
+            selected_channel = selected_channel_index[0]
+            average_data = self.channel_activities.calculate_average_of_channels_from_file(last_n_channels)
+            self.average_active = True
+            self.plot_channel_with_average(selected_channel, average_data, last_n_channels)
+
+        except ValueError as e:
+            tk.messagebox.showerror("Error", str(e))
+
+    def plot_channel_with_average(self, channel, average_data, last_n_channels):
+        """Plot the selected channel's data and the calculated average together."""
+        try:
+            # Read the selected channel's data from the file
+            data = pd.read_csv('channel_data.csv', header=None)
+            channel_data = data.iloc[:, channel].values
+
             self.ax.clear()
 
-            # Add grid to the graph
-            self.ax.grid(True, color='gray', linestyle='--', linewidth=0.5)
+            # Plot the selected channel
+            self.ax.plot(channel_data, label=f"Channel {channel + 1}")
 
-            # Plot only selected channels
-            if self.selected_channels:
-                for channel in self.selected_channels:
-                    self.ax.plot(data_array[:, channel], label=self.channel_names[channel])
-                self.ax.legend()
-            else:
-                # If no channels are selected, plot the first channel by default
-                self.ax.plot(data_array[:, 0], label=self.channel_names[0])
-                self.ax.legend()
+            if average_data is not None:
+                # Plot the average data
+                self.ax.plot(average_data, label=f"Average of last {last_n_channels} channels.", linestyle='--')
+
+            self.ax.legend()
 
             # Set X and Y axis limits based on user input
             try:
@@ -183,12 +221,71 @@ class ImportFromSerial:
                 pass  # Ignore if the input is not a valid integer
 
             self.canvas.draw()
+        except Exception as e:
+            print(f"Veri çiziminde hata: {e}")
+
+
+    def update_graph(self):
+        """Seçilen kanalların grafiğini güncelle."""
+        if self.data_list:
+            # Yeni gelen veriyi dosyaya ekle
+            self.channel_activities.add_channel_data_to_file(self.data_list[-1])
+            self.data_list.clear()  # Veriyi dosyaya kaydettikten sonra listeyi temizle
+
+            self.ax.clear()  # Grafiği temizle
+
+            if self.average_active:
+                # Eğer ortalama aktifse sadece ortalamayı ve seçili kanalı çiz
+                self.calculate_and_plot_average()
+            else:
+                # Seçilen kanalların grafiğini çiz
+                self.selected_channels = [i for i, var in enumerate(self.channel_vars) if var.get()]
+                if self.selected_channels:
+                    for channel in self.selected_channels:
+                        self.plot_selected_channel(channel)
+                else:
+                    # Eğer hiç kanal seçilmemişse, varsayılan olarak ilk kanalı çiz
+                    self.plot_selected_channel(0)
+
+            self.canvas.draw()
+
+
+    def plot_selected_channel(self, channel):
+        """Seçilen kanalın verilerini dosyadan okuyup çiz."""
+        try:
+            data = pd.read_csv('channel_data.csv', header=None)
+            channel_data = data.iloc[:, channel].values
+
+            # Seçilen kanalın verilerini grafiğe ekle
+            self.ax.plot(channel_data, label=f"Kanal {channel + 1}")
+
+            self.ax.legend()
+
+            # Kullanıcı girişine göre X ve Y eksen limitlerini ayarla
+            try:
+                x_start = int(self.x_start_entry.get())
+                x_end = int(self.x_end_entry.get())
+                self.ax.set_xlim([x_start, x_end])
+            except ValueError:
+                pass  # Eğer giriş geçerli bir sayı değilse, yok say
+
+            try:
+                y_start = int(self.y_start_entry.get())
+                y_end = int(self.y_end_entry.get())
+                self.ax.set_ylim([y_start, y_end])
+            except ValueError:
+                pass  # Eğer giriş geçerli bir sayı değilse, yok say
+
+        except Exception as e:
+            print(f"Veri çiziminde hata: {e}")
+
 
     def clear_graph(self):
         """Clear the graph and reset the data list."""
         self.data_list.clear()
         self.ax.clear()
         self.ax.grid(True, color='gray', linestyle='--', linewidth=0.5)  # Re-add the grid after clearing
+        self.average_active = False  # Reset the average active status
         self.canvas.draw()
 
 if __name__ == "__main__":
