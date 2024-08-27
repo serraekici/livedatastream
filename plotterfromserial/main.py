@@ -252,3 +252,4 @@ class ImportFromSerial:
 if __name__ == "__main__":
     root = tk.Tk()
     app = ImportFromSerial(root)
+    root.mainloop()

@@ -14,19 +14,28 @@ class ChannelActivities:
         print(f"Data saved: {data}")
 
     def calculate_average_of_channels_from_file(self, last_n_channels):
-        """Calculate the average of the first 'last_n_channels' channels from the file."""
-        if last_n_channels < 1 or last_n_channels > 10:
-            raise ValueError("Invalid number of channels for average calculation. Please enter a value between 1 and 10.")
+        """Calculate the average of the last n channels from the saved file."""
+        df = pd.read_csv('channel_data.csv', header=None)
+        df = df.iloc[:, -last_n_channels:]
+        return df.mean(axis=1)
 
-        # Read the data from the CSV file
-        try:
-            data = pd.read_csv('channel_data.csv', header=None)
-            # Select only the first `last_n_channels` columns
-            data = data.iloc[:, :last_n_channels]
+    def plot_selected_channels(self, selected_channels, ax, canvas):
+        """Plot multiple selected channels on the same graph."""
+        if not selected_channels:
+            return
+        
+        for channel in selected_channels:
+            if channel in self.channel_data:
+                data = self.channel_data[channel]
+                ax.plot(data, label=f'Channel {channel}')
+        
+        ax.legend(loc='upper right')
+        canvas.draw()
 
-            # Calculate the average across the columns
-            avg = data.mean(axis=1)
-            print(f"Average data calculated: {avg.values}")  # Debugging
-            return avg.values
-        except pd.errors.EmptyDataError:
-            raise ValueError("No channel data available for averaging.")
+    def update_channel_data(self, channel, data):
+        """Update the channel data with new incoming data."""
+        if channel not in self.channel_data:
+            self.channel_data[channel] = []
+        self.channel_data[channel].append(data)
+        if len(self.channel_data[channel]) > 100:  # Assuming a limit of 100 data points per channel
+            self.channel_data[channel].pop(0)

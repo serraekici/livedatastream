@@ -41,11 +41,11 @@ class AverageFeature:
             self.ax.clear()
 
             # Plot the selected channel
-            self.ax.plot(channel_data, label=f"Kanal {channel + 1}")
+            self.ax.plot(channel_data, label=f"Channel {channel + 1}")
 
             if average_data is not None:
                 # Plot the average data
-                self.ax.plot(average_data, label=f"Son {last_n_channels} Kanalın Ortalaması", linestyle='--')
+                self.ax.plot(average_data, label=f"Average of last {last_n_channels} channels.", linestyle='--')
 
             self.ax.legend()
 
