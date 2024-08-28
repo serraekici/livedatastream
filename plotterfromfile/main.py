@@ -8,8 +8,9 @@ from average_feature import AverageFeature
 from time_manager import TimeDisplay
 from channel_activities import ChannelActivities
 
-class ImportFromFile:
 
+class ImportFromFile:
+    print("Application starting...")
     def __init__(self, root):
         self.root = root
         self.root.title("CSV Data Plotter")
@@ -18,7 +19,8 @@ class ImportFromFile:
 
         self.channel_activities = ChannelActivities()
         self.data_list = []
-        
+        self.channel_entries = []  # channel_entries list
+
         # Graph area initialization
         self.fig = Figure(figsize=(8, 6), dpi=100, facecolor='#2f2f2f')
         self.ax = self.fig.add_subplot(111, facecolor='#3f3f3f')
@@ -27,7 +29,6 @@ class ImportFromFile:
         self.selected_channels = []
         self.channel_names = [f"Channel {i+1}" for i in range(10)]
         self.channel_vars = [tk.IntVar() for _ in range(len(self.channel_names))]
-        self.channel_entries = []
 
         # Create the main layout frames
         main_frame = tk.Frame(self.root, bg='#1c1c1c')
@@ -49,40 +50,42 @@ class ImportFromFile:
 
         x_start_label = tk.Label(xy_control_frame, text="X Start:", bg='#333', fg='pink', font=("Arial", 12))
         x_start_label.pack(side=tk.LEFT, padx=5)
+
         self.x_start_entry = tk.Entry(xy_control_frame, width=5)
-        self.x_start_entry.pack(side=tk.LEFT, padx=5)
+        self.x_start_entry.pack(side=tk.LEFT)
 
         x_end_label = tk.Label(xy_control_frame, text="X End:", bg='#333', fg='pink', font=("Arial", 12))
         x_end_label.pack(side=tk.LEFT, padx=5)
+
         self.x_end_entry = tk.Entry(xy_control_frame, width=5)
-        self.x_end_entry.pack(side=tk.LEFT, padx=5)
+        self.x_end_entry.pack(side=tk.LEFT)
 
         y_start_label = tk.Label(xy_control_frame, text="Y Start:", bg='#333', fg='pink', font=("Arial", 12))
         y_start_label.pack(side=tk.LEFT, padx=5)
+
         self.y_start_entry = tk.Entry(xy_control_frame, width=5)
-        self.y_start_entry.pack(side=tk.LEFT, padx=5)
+        self.y_start_entry.pack(side=tk.LEFT)
 
         y_end_label = tk.Label(xy_control_frame, text="Y End:", bg='#333', fg='pink', font=("Arial", 12))
         y_end_label.pack(side=tk.LEFT, padx=5)
+
         self.y_end_entry = tk.Entry(xy_control_frame, width=5)
-        self.y_end_entry.pack(side=tk.LEFT, padx=5)
+        self.y_end_entry.pack(side=tk.LEFT)
 
         # Left sidebar for controls
         left_frame = tk.Frame(main_frame, bg='#333', width=150)
         left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
 
-        # "Load CSV" button above terminal (Now properly placed)
         load_csv_button = tk.Button(left_frame, text="Load CSV", bg='#555', fg='pink', command=self.load_csv)
         load_csv_button.pack(anchor='w', pady=(10, 5))
 
-        # Terminal Area (moved below connection info)
         terminal_label = tk.Label(left_frame, text="Terminal:", bg='#333', fg='pink', font=("Arial", 14))
         terminal_label.pack(anchor='w', pady=(10, 5))
 
         self.terminal = ScrolledText(left_frame, wrap=tk.WORD, width=25, height=15, bg='#2A2B45', fg='white', font=("Arial", 10), bd=0, padx=5, pady=5)
         self.terminal.pack(fill=tk.BOTH, expand=True)
 
-        # Graph area (graph_frame) setup
+        # Graph display area
         graph_frame = tk.Frame(main_frame, bg='#1c1c1c')
         graph_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.canvas = FigureCanvasTkAgg(self.fig, master=graph_frame)
@@ -124,9 +127,6 @@ class ImportFromFile:
                                      ))
         calculate_button.pack(anchor='w', pady=(5, 10))
 
-        self.root.mainloop()
-
-
     def setup_channel_controls(self, parent_frame):
         """Setup the channel selection controls in the given frame."""
         channel_label = tk.Label(parent_frame, text="Select Channels:", bg='#333', fg='pink', font=("Arial", 14))
@@ -145,7 +145,7 @@ class ImportFromFile:
         """Seçilen kanalları güncelle ve UI'da göster."""
         selected_channels_names = [self.channel_names[i] for i, var in enumerate(self.channel_vars) if var.get()]
         self.selected_channels_label.config(text=f"Selected: {', '.join(selected_channels_names)}")
-
+        self.update_graph()
 
     def load_csv(self):
         """CSV dosyasını yükleyip grafiğe veriyi aktar ve terminalde göster."""
@@ -169,14 +169,14 @@ class ImportFromFile:
 
             # Seçilen kanalları tespit et
             self.selected_channels = [i for i, var in enumerate(self.channel_vars) if var.get()]
-
+    
             if self.selected_channels:
                 for channel in self.selected_channels:
                     self.plot_selected_channel(channel)
             else:
                 # Eğer hiçbir kanal seçilmemişse, varsayılan olarak ilk kanalı çiz
                 self.plot_selected_channel(0)
-
+    
             self.canvas.draw()
 
     def plot_selected_channel(self, channel):
@@ -184,9 +184,8 @@ class ImportFromFile:
         try:
             # Kanala ait verileri CSV dosyasından okunan veri listesinden alıyoruz
             channel_data = [row[channel] for row in self.data_list]
-
             # Seçilen kanalın verilerini grafiğe ekle
-            self.ax.plot(channel_data, label=f"Kanal {channel + 1}")
+            self.ax.plot(channel_data, label=f"Channel {channel + 1}")
 
             # Grafikteki tüm çizgiler için bir gösterge (legend) ekliyoruz
             self.ax.legend()
@@ -209,15 +208,15 @@ class ImportFromFile:
         except Exception as e:
             print(f"Veri çiziminde hata: {e}")
 
-
     def clear_graph(self):
         """Grafiği temizle ve veri listesini sıfırla."""
         self.data_list.clear()
         self.ax.clear()
-        self.ax.grid(True, color='gray', linestyle='--', linewidth=0.5)
-        self.average_feature.average_active = False
-        self.canvas.draw()
-
+       
 if __name__ == "__main__":
+    print("Initializing main application...")  # Uygulamanın başlangıç kısmını kontrol edelim
     root = tk.Tk()
     app = ImportFromFile(root)
+    print("Starting main loop...")  # Main loop'un başladığını kontrol edelim
+    root.mainloop()
+    print("Application has exited.")  # Uygulamanın kapandığını kontrol edelim

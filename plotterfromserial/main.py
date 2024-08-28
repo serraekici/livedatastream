@@ -3,7 +3,6 @@ from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import pandas as pd
 from serial_connection import SerialConnection
 from time_manager import TimeDisplay
 from channel_activities import ChannelActivities
@@ -13,23 +12,23 @@ class ImportFromSerial:
 
     def __init__(self, root):
         self.root = root
-        self.root.title("Red Screen Data Plotter")
+        self.root.title("Heart Beat and Brain Voltage Simulator")
         self.root.geometry("1200x800")
         self.root.configure(bg='#1c1c1c')
 
         self.serial_conn = SerialConnection()
         self.channel_activities = ChannelActivities()
-        self.data_list = []
+        self.data_list = [[] for _ in range(10)]  # 10 kanal için boş veri listeleri oluştur
 
-        # Graph area initialization (Moved up)
-        self.fig = Figure(figsize=(8, 6), dpi=100, facecolor='#2f2f2f')  # Set the figure background color to gray
-        self.ax = self.fig.add_subplot(111, facecolor='#3f3f3f')  # Set the axes background color to a slightly darker gray
+        # Initialize the graph area
+        self.fig = Figure(figsize=(8, 6), dpi=100, facecolor='#2f2f2f')
+        self.ax = self.fig.add_subplot(111, facecolor='#3f3f3f')
 
         # Updated to handle 10 channels
         self.selected_channels = []
-        self.channel_names = [f"Channel {i+1}" for i in range(10)]  # 10 channel names
-        self.channel_vars = [tk.IntVar() for _ in range(len(self.channel_names))]  # Variables to track selected channels
-        self.channel_entries = []  # Will hold entry widgets for channel names
+        self.channel_names = [f"Channel {i+1}" for i in range(10)]
+        self.channel_vars = [tk.IntVar() for _ in range(len(self.channel_names))]
+        self.channel_entries = []
 
         # Create the main layout frames
         main_frame = tk.Frame(self.root, bg='#1c1c1c')
@@ -73,7 +72,7 @@ class ImportFromSerial:
         left_frame = tk.Frame(main_frame, bg='#333', width=150)
         left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
 
-        # Graph area (graph_frame) setup (Using previously defined self.fig and self.ax)
+        # Graph area (graph_frame) setup
         graph_frame = tk.Frame(main_frame, bg='#1c1c1c')
         graph_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.canvas = FigureCanvasTkAgg(self.fig, master=graph_frame)
@@ -107,7 +106,8 @@ class ImportFromSerial:
                                        self.connection_status,
                                        self.connection_indicator,
                                        self.indicator_circle,
-                                       self.root))
+                                       self.root,
+                                       self.clear_graph))
         connect_button.pack(fill=tk.X, pady=(5, 5))
 
         disconnect_button = tk.Button(left_frame, text="Disconnect", bg='#456', fg='pink', width=8,
@@ -140,7 +140,7 @@ class ImportFromSerial:
         clear_button = tk.Button(right_frame, text="Clear Graph", bg='#555', fg='pink', command=self.clear_graph, height=2)
         clear_button.pack(side=tk.BOTTOM, pady=10)
 
-        # Average Feature sınıfını başlatma
+        # Average Feature initialization
         self.average_feature = AverageFeature(
             self.channel_activities,
             self.ax,
@@ -184,66 +184,50 @@ class ImportFromSerial:
             self.channel_entries.append(checkbox)
 
     def update_graph(self):
-        """Seçilen kanalların grafiğini güncelle."""
+        """Grafiği sadece yeni gelen verilerle güncelle."""
         if self.data_list:
-            # Yeni gelen veriyi dosyaya ekle
-            self.channel_activities.add_channel_data_to_file(self.data_list[-1])
-            self.data_list.clear()  # Veriyi dosyaya kaydettikten sonra listeyi temizle
+            self.ax.clear()
 
-            self.ax.clear()  # Grafiği temizle
-
-            # Eğer ortalama özelliği aktif değilse seçilen tüm kanalları çiz
-            if not self.average_feature.average_active:
-                self.selected_channels = [i for i, var in enumerate(self.channel_vars) if var.get()]
-                if self.selected_channels:
-                    for channel in self.selected_channels:
-                        self.plot_selected_channel(channel)
-                else:
-                    # Eğer hiç kanal seçilmemişse, varsayılan olarak ilk kanalı çiz
-                    self.plot_selected_channel(0)
+            self.selected_channels = [i for i, var in enumerate(self.channel_vars) if var.get()]
+            if self.selected_channels:
+                for channel in self.selected_channels:
+                    self.plot_selected_channel(channel)
             else:
-                # Ortalama özelliği aktifse ortalamayı ve seçili kanalı çiz
-                self.average_feature.calculate_and_plot_average(
-                    self.average_entry,
-                    self.selected_channels,
-                    self.channel_vars
-                )
+                self.plot_selected_channel(0)
 
             self.canvas.draw()
 
     def plot_selected_channel(self, channel):
-        """Seçilen kanalın verilerini dosyadan okuyup çiz."""
+        """Seçilen kanalın verilerini işleyip çiz."""
         try:
-            data = pd.read_csv('channel_data.csv', header=None)
-            channel_data = data.iloc[:, channel].values
-    
-            # Seçilen kanalın verilerini grafiğe ekle
-            self.ax.plot(channel_data, label=f"Kanal {channel + 1}")
-    
-            self.ax.legend()
-    
-            # Kullanıcı girişine göre X ve Y eksen limitlerini ayarla
-            try:
-                x_start = int(self.x_start_entry.get())
-                x_end = int(self.x_end_entry.get())
-                self.ax.set_xlim([x_start, x_end])
-            except ValueError:
-                pass  # Eğer giriş geçerli bir sayı değilse, yok say
-            
-            try:
-                y_start = int(self.y_start_entry.get())
-                y_end = int(self.y_end_entry.get())
-                self.ax.set_ylim([y_start, y_end])
-            except ValueError:
-                pass  # Eğer giriş geçerli bir sayı değilse, yok say
-            
+            # Son gelen veri ile grafiği güncelle
+            if self.data_list[channel]:
+                data = self.data_list[channel]
+                print(f"Plotting data for channel {channel + 1}: {data}")
+                self.ax.plot(data, label=f"Kanal {channel + 1}")
+                self.ax.legend()
+
+                # X ve Y eksen limitlerini ayarla
+                try:
+                    x_start = int(self.x_start_entry.get())
+                    x_end = int(self.x_end_entry.get())
+                    self.ax.set_xlim([x_start, x_end])
+                except ValueError:
+                    pass
+
+                try:
+                    y_start = int(self.y_start_entry.get())
+                    y_end = int(self.y_end_entry.get())
+                    self.ax.set_ylim([y_start, y_end])
+                except ValueError:
+                    pass
+
         except Exception as e:
             print(f"Veri çiziminde hata: {e}")
-    
-    
+
     def clear_graph(self):
         """Grafiği temizle ve veri listesini sıfırla."""
-        self.data_list.clear()
+        self.data_list = [[] for _ in range(10)]  # Tüm veri listelerini temizle
         self.ax.clear()
         self.ax.grid(True, color='gray', linestyle='--', linewidth=0.5)
         self.average_feature.average_active = False

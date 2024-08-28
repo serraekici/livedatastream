@@ -7,6 +7,6 @@ class TimeDisplay:
         self.update_time()
 
     def update_time(self):
-        current_time = time.strftime('%H:%M:%S')
+        current_time = time.strftime('%D %H:%M:%S')
         self.time_label.config(text=current_time)
         self.time_label.after(1000, self.update_time)
