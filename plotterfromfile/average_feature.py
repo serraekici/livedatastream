@@ -41,7 +41,7 @@ class AverageFeature:
             self.ax.clear()
 
             # Plot the selected channel
-            self.ax.plot(channel_data, label=f"Channel. {channel + 1}")
+            self.ax.plot(channel_data, label=f"Channel {channel + 1}")
 
             if average_data is not None:
                 # Plot the average data

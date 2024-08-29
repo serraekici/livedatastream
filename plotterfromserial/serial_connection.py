@@ -1,5 +1,4 @@
 import serial
-import time
 from tkinter import messagebox
 import serial.tools.list_ports
 
@@ -19,57 +18,66 @@ class SerialConnection:
         ports = self.list_serial_ports()
         port_combobox['values'] = ports
         if ports:
-            port_combobox.current(0)
+            port_combobox.current(0)  # Automatically select the first port
+
+    def connect_to_port(self, port, baudrate, connection_status, connection_indicator, indicator_circle, root):
+        try:
+            self.ser = serial.Serial(
+                port=port,  # Set the port
+                baudrate=baudrate,  # Set the baudrate
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                bytesize=serial.EIGHTBITS,
+                timeout=1
+            )
+            if self.ser.is_open:
+                print("Serial port is open.")
+                connection_status.config(text="Connected", fg='green')
+                connection_indicator.itemconfig(indicator_circle, fill='green')
+            else:
+                print("Failed to open serial port.")
+        except serial.SerialException as e:
+            connection_status.config(text="Disconnected", fg='red')
+            connection_indicator.itemconfig(indicator_circle, fill='red')
+            root.after(500, lambda: self.animate_connection_indicator(connection_indicator, indicator_circle, root))
+            messagebox.showerror("Error", f"Failed to connect to port: {e}")
+
+    def disconnect_from_port(self, connection_status, connection_indicator, indicator_circle, root):
+        if self.ser and self.ser.is_open:
+            self.ser.close()
+            connection_status.config(text="Disconnected", fg='red')
+            connection_indicator.itemconfig(indicator_circle, fill='red')
+            root.after(500, lambda: self.animate_connection_indicator(connection_indicator, indicator_circle, root))
+            messagebox.showinfo("Disconnected", "Serial connection closed.")
+        else:
+            messagebox.showerror("Error", "No open serial connection to close.")
+
+    def read_serial_data(self, terminal, data_list, update_graph, root):
+        """Continuously read data from the serial port and update the graph."""
+        if self.ser and self.ser.is_open:
+            if self.ser.in_waiting > 0:  # Only read if there is data available
+                try:
+                    data = self.ser.readline().decode('utf-8').strip()  # Read and decode the data
+                    if data:
+                        print(f"Received data: {data}")  # Debugging: Print the data to the console
+                        terminal.insert('end', f"{data}\n")  # Insert the data into the terminal
+                        terminal.see('end')  # Scroll to the end to show the latest data
+                        values = data.split(',')
+                        if all(v.replace('.', '', 1).isdigit() for v in values):
+                            float_values = [float(v) for v in values]
+                            data_list.append(float_values)
+                            print(f"Processed data: {float_values}")  # Debugging: Show processed data
+                            update_graph()  # Update the graph immediately after receiving data
+                except serial.SerialException as e:
+                    print(f"Error reading data: {e}")
+        root.after(100, lambda: self.read_serial_data(terminal, data_list, update_graph, root))
 
     def list_serial_ports(self):
         ports = serial.tools.list_ports.comports()
         return [port.device for port in ports]
 
-    def connect_to_port(self, port, baudrate, connection_status, connection_indicator, indicator_circle, root, clear_graph_callback):
-        try:
-            if self.ser and self.ser.is_open:
-                self.ser.close()
-
-            self.ser = serial.Serial(port, baudrate, timeout=1)
-            connection_status.config(text="Connected", fg="green")
-            connection_indicator.itemconfig(indicator_circle, fill="green")
-
-            # Bağlantı kurulduğunda grafiği temizle
-            clear_graph_callback()
-
-        except serial.SerialException as e:
-            messagebox.showerror("Connection Error", f"Failed to connect to {port}.\n{str(e)}")
-            connection_status.config(text="Disconnected", fg="red")
-            connection_indicator.itemconfig(indicator_circle, fill="red")
-
-    def disconnect_from_port(self, connection_status, connection_indicator, indicator_circle, root):
-        if self.ser and self.ser.is_open:
-            self.ser.close()
-        connection_status.config(text="Disconnected", fg="red")
-        connection_indicator.itemconfig(indicator_circle, fill="red")
-
-    def read_serial_data(self, terminal, data_list, update_graph_callback, root):
-        if self.ser and self.ser.is_open:
-            try:
-                line = self.ser.readline().decode('utf-8').strip()
-                if line:
-                    terminal.insert('end', f"Received data: {line}\n")
-                    terminal.yview('end')
-
-                    # Veriyi ayır ve her kanala ekle
-                    values = [int(x) for x in line.split(',')]
-                    for i, value in enumerate(values):
-                        data_list[i].append(value)
-                        if len(data_list[i]) > 1000:  # Çok fazla veri birikmesini önlemek için
-                            data_list[i] = data_list[i][-1000:]
-
-                    # data_list içeriğini terminale yazdır
-                    print(f"Updated data_list for channel {i}: {data_list[i]}")
-
-                    # Grafiği güncelle
-                    update_graph_callback()
-
-            except Exception as e:
-                print(f"Error reading serial data: {e}")
-
-        root.after(1000, self.read_serial_data, terminal, data_list, update_graph_callback, root)
+    def animate_connection_indicator(self, connection_indicator, indicator_circle, root):
+        current_color = connection_indicator.itemcget(indicator_circle, "fill")
+        next_color = 'green' if current_color == 'red' else 'red'
+        connection_indicator.itemconfig(indicator_circle, fill=next_color)
+        root.after(500, lambda: self.animate_connection_indicator(connection_indicator, indicator_circle, root))

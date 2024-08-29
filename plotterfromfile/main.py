@@ -4,21 +4,21 @@ from tkinter.scrolledtext import ScrolledText
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import pandas as pd
+import numpy as np  # Kalp atışı sinyali simülasyonu için eklendi
 from average_feature import AverageFeature
 from time_manager import TimeDisplay
 from channel_activities import ChannelActivities
 
-
 class ImportFromFile:
-    print("Application starting...")
+
     def __init__(self, root):
         self.root = root
-        self.root.title("CSV Data Plotter")
+        self.root.title("Data Plotter")
         self.root.geometry("1200x800")
         self.root.configure(bg='#1c1c1c')
 
         self.channel_activities = ChannelActivities()
-        self.data_list = []
+        self.data_list = []  # Veri listesini başlatıyoruz
         self.channel_entries = []  # channel_entries list
 
         # Graph area initialization
@@ -38,7 +38,7 @@ class ImportFromFile:
         top_bar = tk.Frame(main_frame, bg='#333', height=50)
         top_bar.pack(side=tk.TOP, fill=tk.X)
 
-        logo = tk.Label(top_bar, text="CSV Data Plotter", bg='#333', fg='pink', font=("Arial", 16))
+        logo = tk.Label(top_bar, text="Data Plotter", bg='#333', fg='pink', font=("Arial", 16))
         logo.pack(side=tk.LEFT, padx=10)
 
         self.time_display = TimeDisplay(top_bar, bg='#333', fg='pink', font=("Arial", 12))
@@ -50,27 +50,27 @@ class ImportFromFile:
 
         x_start_label = tk.Label(xy_control_frame, text="X Start:", bg='#333', fg='pink', font=("Arial", 12))
         x_start_label.pack(side=tk.LEFT, padx=5)
-
         self.x_start_entry = tk.Entry(xy_control_frame, width=5)
-        self.x_start_entry.pack(side=tk.LEFT)
+        self.x_start_entry.pack(side=tk.LEFT, padx=5)
+        self.x_start_entry.bind("<KeyRelease>", self.update_graph_limits)
 
         x_end_label = tk.Label(xy_control_frame, text="X End:", bg='#333', fg='pink', font=("Arial", 12))
         x_end_label.pack(side=tk.LEFT, padx=5)
-
         self.x_end_entry = tk.Entry(xy_control_frame, width=5)
-        self.x_end_entry.pack(side=tk.LEFT)
+        self.x_end_entry.pack(side=tk.LEFT, padx=5)
+        self.x_end_entry.bind("<KeyRelease>", self.update_graph_limits)
 
         y_start_label = tk.Label(xy_control_frame, text="Y Start:", bg='#333', fg='pink', font=("Arial", 12))
         y_start_label.pack(side=tk.LEFT, padx=5)
-
         self.y_start_entry = tk.Entry(xy_control_frame, width=5)
-        self.y_start_entry.pack(side=tk.LEFT)
+        self.y_start_entry.pack(side=tk.LEFT, padx=5)
+        self.y_start_entry.bind("<KeyRelease>", self.update_graph_limits)
 
         y_end_label = tk.Label(xy_control_frame, text="Y End:", bg='#333', fg='pink', font=("Arial", 12))
         y_end_label.pack(side=tk.LEFT, padx=5)
-
         self.y_end_entry = tk.Entry(xy_control_frame, width=5)
-        self.y_end_entry.pack(side=tk.LEFT)
+        self.y_end_entry.pack(side=tk.LEFT, padx=5)
+        self.y_end_entry.bind("<KeyRelease>", self.update_graph_limits)
 
         # Left sidebar for controls
         left_frame = tk.Frame(main_frame, bg='#333', width=150)
@@ -102,7 +102,7 @@ class ImportFromFile:
         clear_button = tk.Button(right_frame, text="Clear Graph", bg='#555', fg='pink', command=self.clear_graph, height=2)
         clear_button.pack(side=tk.BOTTOM, pady=10)
 
-        # Average Feature initialization
+        # Average Feature sınıfını başlatma
         self.average_feature = AverageFeature(
             self.channel_activities,
             self.ax,
@@ -112,7 +112,6 @@ class ImportFromFile:
             self.y_end_entry,
             self.canvas
         )
-
         # Average Calculation Controls
         average_label = tk.Label(right_frame, text="Average of N Channels:", bg='#333', fg='pink', font=("Arial", 12))
         average_label.pack(anchor='w', pady=(10, 5))
@@ -126,6 +125,22 @@ class ImportFromFile:
                                          self.channel_vars
                                      ))
         calculate_button.pack(anchor='w', pady=(5, 10))
+
+    def update_graph_limits(self, event=None):
+        """Updates the graph limits based on user input."""
+        try:
+            x_start = float(self.x_start_entry.get())
+            x_end = float(self.x_end_entry.get())
+            y_start = float(self.y_start_entry.get())
+            y_end = float(self.y_end_entry.get())
+
+            self.ax.set_xlim([x_start, x_end])
+            self.ax.set_ylim([y_start, y_end])
+            self.canvas.draw()
+
+        except ValueError:
+            # Ignore invalid inputs such as non-numeric values
+            pass
 
     def setup_channel_controls(self, parent_frame):
         """Setup the channel selection controls in the given frame."""
@@ -154,6 +169,9 @@ class ImportFromFile:
             # CSV dosyasını pandas ile okuyup, her sütunu bir kanal olarak işlemek
             self.data_list = pd.read_csv(file_path, header=None).values.tolist()
 
+            # Print data_list structure for debugging
+            print(f"Loaded data_list (first 5 rows): {self.data_list[:5]}")
+
             # Terminalde dosyadaki verileri göster
             with open(file_path, 'r') as file:
                 csv_content = file.read()
@@ -169,54 +187,86 @@ class ImportFromFile:
 
             # Seçilen kanalları tespit et
             self.selected_channels = [i for i, var in enumerate(self.channel_vars) if var.get()]
-    
+
             if self.selected_channels:
                 for channel in self.selected_channels:
                     self.plot_selected_channel(channel)
             else:
                 # Eğer hiçbir kanal seçilmemişse, varsayılan olarak ilk kanalı çiz
                 self.plot_selected_channel(0)
-    
+                # Eğer ortalama özelliği aktif değilse seçilen tüm kanalları çiz
+            if not self.average_feature.average_active:
+                self.selected_channels = [i for i, var in enumerate(self.channel_vars) if var.get()]
+                if self.selected_channels:
+                    for channel in self.selected_channels:
+                        self.plot_selected_channel(channel)
+                else:
+                    # Eğer hiç kanal seçilmemişse, varsayılan olarak ilk kanalı çiz
+                    self.plot_selected_channel(0)
+            else:
+                # Ortalama özelliği aktifse ortalamayı ve seçili kanalı çiz
+                self.average_feature.calculate_and_plot_average(
+                    self.average_entry,
+                    self.selected_channels,
+                    self.channel_vars
+                )
+
+            self.canvas.draw()
+
             self.canvas.draw()
 
     def plot_selected_channel(self, channel):
-        """Seçilen kanalın verilerini dosyadan okuyup çiz."""
+        """Seçilen kanalın verilerini grafiğe çiz."""
+        if not self.data_list:
+            return  # Veri yoksa işlem yapma
+    
+        channel_data = self.generate_heartbeat_data(len(self.data_list))  # Kalp atışı sinyali simülasyonu
+    
+        # Kanal verisini çiz
+        self.ax.plot(channel_data, label=f"Channel {channel + 1}", color=f"C{channel}")
+    
+        # X-Y limitleri ayarla
+        x_start = self.get_entry_value(self.x_start_entry, 0)
+        x_end = self.get_entry_value(self.x_end_entry, len(channel_data) - 1)
+        y_start = self.get_entry_value(self.y_start_entry, min(channel_data))
+        y_end = self.get_entry_value(self.y_end_entry, max(channel_data))
+    
+        self.ax.set_xlim(x_start, x_end)
+        self.ax.set_ylim(y_start, y_end)
+        self.ax.set_xlabel("X Axis")
+        self.ax.set_ylabel("Y Axis")
+        self.ax.legend()
+    
+        # Grid ekleme
+        self.ax.grid(True)
+    
+
+    def generate_heartbeat_data(self, length):
+        """Kalp atışı benzeri bir sinyal simüle eder."""
+        time = np.linspace(0, 10, length)
+        signal = 0.5 * (np.sin(2 * np.pi * 1.0 * time) + np.sin(2 * np.pi * 2.0 * time) + np.sin(2 * np.pi * 3.0 * time))
+        signal += 0.1 * np.random.normal(size=time.shape)  # Gürültü ekleyerek daha gerçekçi hale getirme
+        return signal
+
+    def get_entry_value(self, entry_widget, default_value):
+        """Entry widget değerini al ve geçerli bir sayı döndür."""
         try:
-            # Kanala ait verileri CSV dosyasından okunan veri listesinden alıyoruz
-            channel_data = [row[channel] for row in self.data_list]
-            # Seçilen kanalın verilerini grafiğe ekle
-            self.ax.plot(channel_data, label=f"Channel {channel + 1}")
-
-            # Grafikteki tüm çizgiler için bir gösterge (legend) ekliyoruz
-            self.ax.legend()
-
-            # Kullanıcı girişine göre X ve Y eksen limitlerini ayarla
-            try:
-                x_start = int(self.x_start_entry.get())
-                x_end = int(self.x_end_entry.get())
-                self.ax.set_xlim([x_start, x_end])
-            except ValueError:
-                pass  # Eğer giriş geçerli bir sayı değilse, yok say
-
-            try:
-                y_start = int(self.y_start_entry.get())
-                y_end = int(self.y_end_entry.get())
-                self.ax.set_ylim([y_start, y_end])
-            except ValueError:
-                pass  # Eğer giriş geçerli bir sayı değilse, yok say
-
-        except Exception as e:
-            print(f"Veri çiziminde hata: {e}")
+            return float(entry_widget.get())
+        except ValueError:
+            return default_value
 
     def clear_graph(self):
-        """Grafiği temizle ve veri listesini sıfırla."""
-        self.data_list.clear()
+        """Grafiği temizle ve terminali sıfırla."""
         self.ax.clear()
-       
-if __name__ == "__main__":
-    print("Initializing main application...")  # Uygulamanın başlangıç kısmını kontrol edelim
+        self.canvas.draw()
+        self.average_feature.average_active = False
+        self.terminal.delete(1.0, tk.END)
+
+# Main application
+def main():
     root = tk.Tk()
     app = ImportFromFile(root)
-    print("Starting main loop...")  # Main loop'un başladığını kontrol edelim
     root.mainloop()
-    print("Application has exited.")  # Uygulamanın kapandığını kontrol edelim
+
+if __name__ == "__main__":
+    main()
