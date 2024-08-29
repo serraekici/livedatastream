@@ -20,7 +20,7 @@ class ImportFromFile:
         self.channel_activities = ChannelActivities()
         self.data_list = []  # Veri listesini başlatıyoruz
         self.channel_entries = []  # channel_entries list
-
+        self.kalman_filter_active = False  # Track Kalman filter status
         # Graph area initialization
         self.fig = Figure(figsize=(8, 6), dpi=100, facecolor='#2f2f2f')
         self.ax = self.fig.add_subplot(111, facecolor='#3f3f3f')
@@ -125,6 +125,10 @@ class ImportFromFile:
                                          self.channel_vars
                                      ))
         calculate_button.pack(anchor='w', pady=(5, 10))
+        # Kalman Filter Toggle Button
+        kalman_button = tk.Button(right_frame, text="Toggle Kalman Filter", bg='#456', fg='pink',
+                                  command=self.toggle_kalman_filter)
+        kalman_button.pack(anchor='w', pady=(5, 8))
 
     def update_graph_limits(self, event=None):
         """Updates the graph limits based on user input."""
@@ -141,6 +145,15 @@ class ImportFromFile:
         except ValueError:
             # Ignore invalid inputs such as non-numeric values
             pass
+        
+    def toggle_kalman_filter(self):
+        """Toggle the Kalman filter on and off."""
+        self.kalman_filter_active = not self.kalman_filter_active
+        if self.kalman_filter_active:
+            print("Kalman filter activated")
+        else:
+            print("Kalman filter deactivated")
+        self.update_graph()
 
     def setup_channel_controls(self, parent_frame):
         """Setup the channel selection controls in the given frame."""
@@ -219,7 +232,10 @@ class ImportFromFile:
         """Seçilen kanalın verilerini grafiğe çiz."""
         if not self.data_list:
             return  # Veri yoksa işlem yapma
-    
+        if self.kalman_filter_active:
+                # Apply Kalman filter to the channel data
+                filtered_data = np.array([self.average_feature.kalman_filter.filter(value) for value in channel_data])
+                self.ax.plot(filtered_data, label=f"Filtered Channel {channel + 1}", linestyle='--')
         channel_data = self.generate_heartbeat_data(len(self.data_list))  # Kalp atışı sinyali simülasyonu
     
         # Kanal verisini çiz
