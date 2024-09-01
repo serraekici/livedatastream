@@ -21,6 +21,7 @@ class ImportFromFile:
         self.data_list = []  # Veri listesini başlatıyoruz
         self.channel_entries = []  # channel_entries list
         self.kalman_filter_active = False  # Track Kalman filter status
+
         # Graph area initialization
         self.fig = Figure(figsize=(8, 6), dpi=100, facecolor='#2f2f2f')
         self.ax = self.fig.add_subplot(111, facecolor='#3f3f3f')
@@ -112,6 +113,7 @@ class ImportFromFile:
             self.y_end_entry,
             self.canvas
         )
+
         # Average Calculation Controls
         average_label = tk.Label(right_frame, text="Average of N Channels:", bg='#333', fg='pink', font=("Arial", 12))
         average_label.pack(anchor='w', pady=(10, 5))
@@ -125,6 +127,7 @@ class ImportFromFile:
                                          self.channel_vars
                                      ))
         calculate_button.pack(anchor='w', pady=(5, 10))
+
         # Kalman Filter Toggle Button
         kalman_button = tk.Button(right_frame, text="Toggle Kalman Filter", bg='#456', fg='pink',
                                   command=self.toggle_kalman_filter)
@@ -145,7 +148,7 @@ class ImportFromFile:
         except ValueError:
             # Ignore invalid inputs such as non-numeric values
             pass
-        
+
     def toggle_kalman_filter(self):
         """Toggle the Kalman filter on and off."""
         self.kalman_filter_active = not self.kalman_filter_active
@@ -196,24 +199,20 @@ class ImportFromFile:
     def update_graph(self):
         """Seçilen kanalların grafiğini güncelle."""
         if self.data_list:
-            self.ax.clear()
+            self.ax.clear()  # Clear the axes to avoid duplicate labels
 
             # Seçilen kanalları tespit et
             self.selected_channels = [i for i, var in enumerate(self.channel_vars) if var.get()]
 
-            if self.selected_channels:
-                for channel in self.selected_channels:
+            # Plot each selected channel only once
+            plotted_labels = set()
+            for channel in self.selected_channels:
+                if channel not in plotted_labels:
                     self.plot_selected_channel(channel)
-            else:
-                # Eğer hiçbir kanal seçilmemişse, varsayılan olarak ilk kanalı çiz
-                self.plot_selected_channel(0)
-                # Eğer ortalama özelliği aktif değilse seçilen tüm kanalları çiz
+                    plotted_labels.add(channel)
+
             if not self.average_feature.average_active:
-                self.selected_channels = [i for i, var in enumerate(self.channel_vars) if var.get()]
-                if self.selected_channels:
-                    for channel in self.selected_channels:
-                        self.plot_selected_channel(channel)
-                else:
+                if not self.selected_channels:
                     # Eğer hiç kanal seçilmemişse, varsayılan olarak ilk kanalı çiz
                     self.plot_selected_channel(0)
             else:
@@ -224,38 +223,35 @@ class ImportFromFile:
                     self.channel_vars
                 )
 
-            self.canvas.draw()
-
+            self.ax.legend()  # Ensure the legend is updated
             self.canvas.draw()
 
     def plot_selected_channel(self, channel):
         """Seçilen kanalın verilerini grafiğe çiz."""
         if not self.data_list:
             return  # Veri yoksa işlem yapma
+
+        channel_data = [row[channel] for row in self.data_list]  # Gerçek kanal verisi
         if self.kalman_filter_active:
-                # Apply Kalman filter to the channel data
-                filtered_data = np.array([self.average_feature.kalman_filter.filter(value) for value in channel_data])
-                self.ax.plot(filtered_data, label=f"Filtered Channel {channel + 1}", linestyle='--')
-        channel_data = self.generate_heartbeat_data(len(self.data_list))  # Kalp atışı sinyali simülasyonu
-    
-        # Kanal verisini çiz
-        self.ax.plot(channel_data, label=f"Channel {channel + 1}", color=f"C{channel}")
-    
+            # Apply Kalman filter to the channel data
+            filtered_data = self.channel_activities.apply_kalman_filter(channel_data)
+            self.ax.plot(filtered_data, label=f"Filtered Channel {channel + 1}", linestyle='--')
+        else:
+            self.ax.plot(channel_data, label=f"Channel {channel + 1}", color=f"C{channel}")
+
         # X-Y limitleri ayarla
         x_start = self.get_entry_value(self.x_start_entry, 0)
         x_end = self.get_entry_value(self.x_end_entry, len(channel_data) - 1)
         y_start = self.get_entry_value(self.y_start_entry, min(channel_data))
         y_end = self.get_entry_value(self.y_end_entry, max(channel_data))
-    
+
         self.ax.set_xlim(x_start, x_end)
         self.ax.set_ylim(y_start, y_end)
         self.ax.set_xlabel("X Axis")
         self.ax.set_ylabel("Y Axis")
-        self.ax.legend()
-    
+
         # Grid ekleme
         self.ax.grid(True)
-    
 
     def generate_heartbeat_data(self, length):
         """Kalp atışı benzeri bir sinyal simüle eder."""

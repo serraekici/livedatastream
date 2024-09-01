@@ -74,3 +74,34 @@ class ChannelActivities:
             raise ValueError(f"Channel {channel_index + 1} data is not available.")
         except Exception as e:
             raise ValueError(f"An error occurred while retrieving channel data: {str(e)}")
+
+    def apply_kalman_filter(self, data):
+        """Apply Kalman filter to the provided data."""
+        n_iter = len(data)
+        sz = (n_iter,)  # size of array
+        Q = 1e-5  # process variance
+
+        # Allocate space for arrays
+        xhat = np.zeros(sz)  # a posteriori estimate of x
+        P = np.zeros(sz)  # a posteriori error estimate
+        xhatminus = np.zeros(sz)  # a priori estimate of x
+        Pminus = np.zeros(sz)  # a priori error estimate
+        K = np.zeros(sz)  # gain or blending factor
+
+        R = 0.1 ** 2  # estimate of measurement variance
+
+        # Initial guesses
+        xhat[0] = data[0]
+        P[0] = 1.0
+
+        for k in range(1, n_iter):
+            # Time update
+            xhatminus[k] = xhat[k-1]
+            Pminus[k] = P[k-1] + Q
+
+            # Measurement update
+            K[k] = Pminus[k] / (Pminus[k] + R)
+            xhat[k] = xhatminus[k] + K[k] * (data[k] - xhatminus[k])
+            P[k] = (1 - K[k]) * Pminus[k]
+
+        return xhat

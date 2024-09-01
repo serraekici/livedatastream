@@ -9,7 +9,7 @@ from serial_connection import SerialConnection
 from time_manager import TimeDisplay
 from channel_activities import ChannelActivities
 from average_feature import AverageFeature
-
+from average_feature import KalmanFilter
 class ImportFromSerial:
 
     def __init__(self, root):
@@ -21,17 +21,16 @@ class ImportFromSerial:
         self.serial_conn = SerialConnection()
         self.channel_activities = ChannelActivities()
         self.data_list = []
-        self.kalman_filter_active = False  # Track Kalman filter status
-
+        self.kalman_filter_active = False
         # Graph area initialization
         self.fig = Figure(figsize=(8, 6), dpi=100, facecolor='#2f2f2f')
         self.ax = self.fig.add_subplot(111, facecolor='#3f3f3f')
 
         # Updated to handle 10 channels
         self.selected_channels = []
-        self.channel_names = [f"Channel {i+1}" for i in range(10)]
-        self.channel_vars = [tk.IntVar() for _ in range(len(self.channel_names))]
-        self.channel_entries = []
+        self.channel_names = [f"Channel {i+1}" for i in range(10)]  # 10 channel names
+        self.channel_vars = [tk.IntVar() for _ in range(len(self.channel_names))]  # Variables to track selected channels
+        self.channel_entries = []  # Will hold entry widgets for channel names
 
         # Create the main layout frames
         main_frame = tk.Frame(self.root, bg='#1c1c1c')
@@ -70,12 +69,13 @@ class ImportFromSerial:
         y_end_label.pack(side=tk.LEFT, padx=5)
         self.y_end_entry = tk.Entry(xy_control_frame, width=5)
         self.y_end_entry.pack(side=tk.LEFT, padx=5)
+        #GRID
         self.ax.grid(True)
         # Left sidebar for controls
         left_frame = tk.Frame(main_frame, bg='#333', width=150)
         left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
 
-        # Graph area (graph_frame) setup
+        # Graph area (graph_frame) setup (Using previously defined self.fig and self.ax)
         graph_frame = tk.Frame(main_frame, bg='#1c1c1c')
         graph_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.canvas = FigureCanvasTkAgg(self.fig, master=graph_frame)
@@ -110,7 +110,7 @@ class ImportFromSerial:
                                        self.connection_status,
                                        self.connection_indicator,
                                        self.indicator_circle,
-                                       self))
+                                       self.root))
         connect_button.pack(fill=tk.X, pady=(5, 5))
 
         disconnect_button = tk.Button(left_frame, text="Disconnect", bg='#456', fg='pink', width=8,
@@ -118,7 +118,7 @@ class ImportFromSerial:
                                           self.connection_status,
                                           self.connection_indicator,
                                           self.indicator_circle,
-                                          self))
+                                          self.root))
         disconnect_button.pack(fill=tk.X, pady=(5, 5))
 
         # Connection Status Indicator
@@ -129,17 +129,17 @@ class ImportFromSerial:
         self.indicator_circle = self.connection_indicator.create_oval(2, 2, 18, 18, fill='red')
         self.connection_indicator.pack(pady=(5, 10))
 
-        # Terminal Area
+        # Terminal Area (moved below connection info)
         terminal_label = tk.Label(left_frame, text="Terminal:", bg='#333', fg='pink', font=("Arial", 14))
         terminal_label.pack(anchor='w', pady=(10, 5))
 
         self.terminal = ScrolledText(left_frame, wrap=tk.WORD, width=25, height=15, bg='#2A2B45', fg='white', font=("Arial", 10), bd=0, padx=5, pady=5)
         self.terminal.pack(fill=tk.BOTH, expand=True)
 
-        # Setup Channel Controls in the right sidebar
+        # Setup Channel Controls in the right sidebar using ChannelActivities
         self.setup_channel_controls(right_frame)
 
-        # Clear Graph Button
+        # Clear Graph Button at the bottom of the right frame
         clear_button = tk.Button(right_frame, text="Clear Graph", bg='#555', fg='pink', command=self.clear_graph, height=2)
         clear_button.pack(side=tk.BOTTOM, pady=10)
 
@@ -177,10 +177,7 @@ class ImportFromSerial:
         self.serial_conn.refresh_ports(self.port_combobox)
 
         # Start reading the serial data in real-time
-        self.serial_conn.read_serial_data(self)
-
-        # Schedule periodic updates for the graph
-        self.schedule_graph_updates()
+        self.serial_conn.read_serial_data(self.terminal, self.data_list, self.update_graph, self.root)
 
         self.root.mainloop()
 
@@ -204,10 +201,11 @@ class ImportFromSerial:
         channel_label.pack(anchor='w', pady=(10, 5))
 
         for idx, channel_name in enumerate(self.channel_names):
-            checkbox = tk.Checkbutton(parent_frame, text=channel_name, variable=self.channel_vars[idx], bg='#333', fg='pink', font=("Arial", 12), command=self.update_graph)
+            checkbox = tk.Checkbutton(parent_frame, text=channel_name, variable=self.channel_vars[idx], bg='#333', fg='pink', font=("Arial", 12))
             checkbox.pack(anchor='w', padx=5, pady=2)
             self.channel_entries.append(checkbox)
 
+    # Inside the update_graph method
     def update_graph(self):
         """Update the graph based on the latest data in real-time."""
         if self.data_list:
@@ -248,9 +246,7 @@ class ImportFromSerial:
 
             self.ax.grid(True)  # Ensure the grid is always visible after updating the graph
             self.canvas.draw()  # Redraw the canvas with the updated graph
-
-
-
+    
     def plot_selected_channel(self, channel):
         """Plot the selected channel's data from the file and apply the Kalman filter if active."""
         try:
@@ -283,11 +279,17 @@ class ImportFromSerial:
 
         except Exception as e:
             print(f"Error plotting data: {e}")
-
+    
+    def test_graph_update(self):
+        # Add test data manually to see if the graph updates correctly
+        self.data_list.append([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]])
+        self.update_graph()
+    
     def clear_graph(self):
-        """Clear the graph and reset the data list."""
+        """Grafiği temizle ve veri listesini sıfırla."""
         self.data_list.clear()
         self.ax.clear()
+        self.ax.grid(True, color='gray', linestyle='--', linewidth=0.5)
         self.average_feature.average_active = False
         self.canvas.draw()
 
