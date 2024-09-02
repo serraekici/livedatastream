@@ -22,10 +22,10 @@ class SerialConnection:
 
     def connect_to_port(self, port, baudrate, connection_status, connection_indicator, indicator_circle, root):
         try:
-            print(f"Trying to connect to port: {port} with baudrate: {baudrate}")  # Hata ayıklama için ekledim
+            print(f"Trying to connect to port: {port} with baudrate: {baudrate}")  # Debugging
             self.ser = serial.Serial(
                 port=port,  # Set the port
-                baudrate=baudrate,  # Set the baudrate
+                baudrate=int(baudrate),  # Set the baudrate
                 parity=serial.PARITY_NONE,
                 stopbits=serial.STOPBITS_ONE,
                 bytesize=serial.EIGHTBITS,
@@ -43,7 +43,6 @@ class SerialConnection:
             root.after(500, lambda: self.animate_connection_indicator(connection_indicator, indicator_circle, root))
             messagebox.showerror("Error", f"Failed to connect to port: {e}")
 
-
     def disconnect_from_port(self, connection_status, connection_indicator, indicator_circle, root):
         if self.ser and self.ser.is_open:
             self.ser.close()
@@ -54,11 +53,11 @@ class SerialConnection:
         else:
             messagebox.showerror("Error", "No open serial connection to close.")
 
-    def read_serial_data(self, terminal, data_list, update_graph, root):
-        """Continuously read data from the serial port and update the graph."""
+    def read_serial_data(self, terminal, data_list, channel_activities, root):
+        """Continuously read data from the serial port and update the data list and terminal."""
         if self.ser and self.ser.is_open:
-            if self.ser.in_waiting > 0:  # Only read if there is data available
-                try:
+            try:
+                if self.ser.in_waiting > 0:  # Only read if there is data available
                     data = self.ser.readline().decode('utf-8').strip()  # Read and decode the data
                     if data:
                         print(f"Received data: {data}")  # Debugging: Print the data to the console
@@ -68,11 +67,11 @@ class SerialConnection:
                         if all(v.replace('.', '', 1).isdigit() for v in values):
                             float_values = [float(v) for v in values]
                             data_list.append(float_values)
+                            channel_activities.add_channel_data_to_file(float_values)
                             print(f"Processed data: {float_values}")  # Debugging: Show processed data
-                            update_graph()  # Update the graph immediately after receiving data
-                except serial.SerialException as e:
-                    print(f"Error reading data: {e}")
-        root.after(100, lambda: self.read_serial_data(terminal, data_list, update_graph, root))
+            except serial.SerialException as e:
+                print(f"Error reading data: {e}")
+        root.after(100, lambda: self.read_serial_data(terminal, data_list, channel_activities, root))
 
     def list_serial_ports(self):
         ports = serial.tools.list_ports.comports()

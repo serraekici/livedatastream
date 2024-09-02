@@ -116,9 +116,9 @@ class ImportFromFile:
 
         # Average Calculation Controls
         average_label = tk.Label(right_frame, text="Average of N Channels:", bg='#333', fg='pink', font=("Arial", 12))
-        average_label.pack(anchor='w', pady=(10, 5))
+        average_label.pack(anchor='w', pady=(0, 5))
         self.average_entry = tk.Entry(right_frame, width=10)
-        self.average_entry.pack(anchor='w', pady=(5, 5))
+        self.average_entry.pack(anchor='w', pady=(0, 5))
 
         calculate_button = tk.Button(right_frame, text="Calculate and Plot", bg='#456', fg='pink',
                                      command=lambda: self.average_feature.calculate_and_plot_average(
@@ -131,7 +131,7 @@ class ImportFromFile:
         # Kalman Filter Toggle Button
         kalman_button = tk.Button(right_frame, text="Toggle Kalman Filter", bg='#456', fg='pink',
                                   command=self.toggle_kalman_filter)
-        kalman_button.pack(anchor='w', pady=(5, 8))
+        kalman_button.pack(anchor='w', pady=(5, 10))
 
     def update_graph_limits(self, event=None):
         """Updates the graph limits based on user input."""

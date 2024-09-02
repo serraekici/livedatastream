@@ -1,7 +1,6 @@
-import numpy as np
+import pandas as pd
 import tkinter as tk
 
-import pandas as pd
 class KalmanFilter:
     def __init__(self, process_variance, measurement_variance, estimated_measurement_variance):
         self.process_variance = process_variance
@@ -30,7 +29,7 @@ class AverageFeature:
         self.y_end_entry = y_end_entry
         self.canvas = canvas
         self.average_active = False
-        self.kalman_filter = KalmanFilter(1e-5, 1e-1, 1e-1)  # Kalman filtresi varsayılan parametrelerle başlatıldı
+        self.kalman_filter = KalmanFilter(1e-5, 1e-1, 1e-1)  # Kalman filter with default parameters
 
     def calculate_and_plot_average(self, average_entry, selected_channels, channel_vars):
         """Calculate the average of the first N channels and plot it with a selected channel."""
@@ -39,12 +38,14 @@ class AverageFeature:
             if last_n_channels <= 1 or last_n_channels > 10:
                 raise ValueError("The number of channels must be between 2 and 10.")
 
-            selected_channel_index = [i for i, var in enumerate(channel_vars) if var.get()]
-            if len(selected_channel_index) != 1:
+            selected_channel_indices = [i for i, var in enumerate(channel_vars) if var.get()]
+            if len(selected_channel_indices) != 1:
                 raise ValueError("Please select exactly one channel to compare with the average.")
 
-            selected_channel = selected_channel_index[0]
+            selected_channel = selected_channel_indices[0]
             average_data = self.channel_activities.calculate_average_of_channels_from_file(last_n_channels)
+            if not average_data:
+                raise ValueError("No average data available. Ensure that data is being received and saved correctly.")
             self.average_active = True
             self.plot_channel_with_average(selected_channel, average_data, last_n_channels)
 
@@ -56,6 +57,12 @@ class AverageFeature:
         try:
             # Read the selected channel's data from the file
             data = pd.read_csv('channel_data.csv', header=None)
+            if data.empty:
+                tk.messagebox.showerror("Error", "No data available to plot.")
+                return
+            if channel >= data.shape[1]:
+                tk.messagebox.showerror("Error", f"Selected channel {channel + 1} is out of range.")
+                return
             channel_data = data.iloc[:, channel].values
 
             self.ax.clear()
@@ -65,7 +72,7 @@ class AverageFeature:
 
             if average_data is not None:
                 # Plot the average data
-                self.ax.plot(average_data, label=f"Average of last {last_n_channels} channels.", linestyle='--')
+                self.ax.plot(average_data, label=f"Average of last {last_n_channels} channels", linestyle='--')
 
             self.ax.legend()
 
@@ -78,12 +85,13 @@ class AverageFeature:
                 pass  # Ignore if the input is not a valid integer
 
             try:
-                y_start = int(self.y_start_entry.get())
-                y_end = int(self.y_end_entry.get())
+                y_start = float(self.y_start_entry.get())
+                y_end = float(self.y_end_entry.get())
                 self.ax.set_ylim([y_start, y_end])
             except ValueError:
-                pass  # Ignore if the input is not a valid integer
+                pass  # Ignore if the input is not a valid float
 
+            self.ax.grid(True)
             self.canvas.draw()
         except Exception as e:
-            print(f"Veri çiziminde hata: {e}")
+            print(f"Error plotting data: {e}")
