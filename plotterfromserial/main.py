@@ -3,6 +3,7 @@ from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import numpy as np
 from serial_connection import SerialConnection
 from time_manager import TimeDisplay
 from channel_activities import ChannelActivities
@@ -208,6 +209,15 @@ class ImportFromSerial:
                 else:
                     self.ax.plot(channel_data, label=f"Channel {channel + 1}")
 
+            # Eğer ortalama aktifse, ortalama verisini yeniden çiz
+            if self.average_feature.average_active:
+                # Ortalama verisini yeniden çiz
+                last_n_channels = int(self.average_entry.get())
+                average_data = self.channel_activities.calculate_average_of_channels_from_file(last_n_channels)
+                if average_data:  # Make sure there is data to plot
+                    selected_channel = self.selected_channels[0]
+                    self.ax.plot(average_data, label=f"Average of last {last_n_channels} channels", linestyle='--')
+
             self.ax.legend()
 
             # Kullanıcı girişi baz alınarak X ve Y eksen limitlerini ayarla
@@ -224,9 +234,13 @@ class ImportFromSerial:
                 self.ax.set_ylim([y_start, y_end])
             except ValueError:
                 pass
-
+            
             self.ax.grid(True)  # Grafiği güncelledikten sonra grid'in her zaman görünür olmasını sağla
             self.canvas.draw()  # Güncellenmiş grafikle kanvası yeniden çiz
+
+            # Schedule the next update after a short delay
+            self.root.after(1000, self.update_graph)  # Update every second (1000ms)
+
 
     def clear_graph(self):
         """Grafiği temizle ve veri listesini sıfırla."""
@@ -236,6 +250,13 @@ class ImportFromSerial:
         self.ax.grid(True, color='gray', linestyle='--', linewidth=0.5)
         self.average_feature.average_active = False
         self.canvas.draw()
+
+    def generate_heartbeat_data(self, length):
+        """Kalp atışı benzeri bir sinyal simüle eder."""
+        time = np.linspace(0, 10, length)
+        signal = 0.5 * (np.sin(2 * np.pi * 1.0 * time) + np.sin(2 * np.pi * 2.0 * time) + np.sin(2 * np.pi * 3.0 * time))
+        signal += 0.1 * np.random.normal(size=time.shape)  # Gürültü ekleyerek daha gerçekçi hale getirme
+        return signal
 
     def calculate_average(self):
         try:
