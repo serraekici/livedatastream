@@ -22,6 +22,7 @@ class SerialConnection:
 
     def connect_to_port(self, port, baudrate, connection_status, connection_indicator, indicator_circle, root):
         try:
+            print(f"Trying to connect to port: {port} with baudrate: {baudrate}")  # Hata ayıklama için ekledim
             self.ser = serial.Serial(
                 port=port,  # Set the port
                 baudrate=baudrate,  # Set the baudrate
@@ -41,6 +42,7 @@ class SerialConnection:
             connection_indicator.itemconfig(indicator_circle, fill='red')
             root.after(500, lambda: self.animate_connection_indicator(connection_indicator, indicator_circle, root))
             messagebox.showerror("Error", f"Failed to connect to port: {e}")
+
 
     def disconnect_from_port(self, connection_status, connection_indicator, indicator_circle, root):
         if self.ser and self.ser.is_open:

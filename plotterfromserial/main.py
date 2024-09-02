@@ -3,15 +3,12 @@ from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import numpy as np
-import pandas as pd
 from serial_connection import SerialConnection
 from time_manager import TimeDisplay
 from channel_activities import ChannelActivities
 from average_feature import AverageFeature
-from average_feature import KalmanFilter
-class ImportFromSerial:
 
+class ImportFromSerial:
     def __init__(self, root):
         self.root = root
         self.root.title("Red Screen Data Plotter")
@@ -22,21 +19,30 @@ class ImportFromSerial:
         self.channel_activities = ChannelActivities()
         self.data_list = []
         self.kalman_filter_active = False
-        # Graph area initialization
+
+        # GUI bileşenlerinin oluşturulması
+        self.setup_gui()
+
+        # Portları yenileme ve veri okuma işlemleri GUI yüklendikten sonra
+        self.serial_conn.refresh_ports(self.port_combobox)
+        self.serial_conn.read_serial_data(self.terminal, self.data_list, self.update_graph, self.root)
+
+    def setup_gui(self):
+        # Grafik alanı oluşturma
         self.fig = Figure(figsize=(8, 6), dpi=100, facecolor='#2f2f2f')
         self.ax = self.fig.add_subplot(111, facecolor='#3f3f3f')
 
-        # Updated to handle 10 channels
+        # 10 kanal için güncellendi
         self.selected_channels = []
-        self.channel_names = [f"Channel {i+1}" for i in range(10)]  # 10 channel names
-        self.channel_vars = [tk.IntVar() for _ in range(len(self.channel_names))]  # Variables to track selected channels
-        self.channel_entries = []  # Will hold entry widgets for channel names
+        self.channel_names = [f"Channel {i+1}" for i in range(10)]  # 10 kanal adı
+        self.channel_vars = [tk.IntVar() for _ in range(len(self.channel_names))]  # Kanal seçimlerini takip etmek için değişkenler
+        self.channel_entries = []  # Kanal adı giriş widget'ları için
 
-        # Create the main layout frames
+        # Ana çerçevelerin oluşturulması
         main_frame = tk.Frame(self.root, bg='#1c1c1c')
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Top bar for LiveDataStream logo, Time, and X-Y Limit inputs
+        # Üst çubuk: Logo, Zaman ve XY Limiti Girdileri
         top_bar = tk.Frame(main_frame, bg='#333', height=50)
         top_bar.pack(side=tk.TOP, fill=tk.X)
 
@@ -46,7 +52,7 @@ class ImportFromSerial:
         self.time_display = TimeDisplay(top_bar, bg='#333', fg='pink', font=("Arial", 12))
         self.time_display.time_label.pack(side=tk.RIGHT, padx=10)
 
-        # X-Y Control Frame in the top bar
+        # XY Kontrol Çerçevesi
         xy_control_frame = tk.Frame(top_bar, bg='#333')
         xy_control_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
 
@@ -69,23 +75,15 @@ class ImportFromSerial:
         y_end_label.pack(side=tk.LEFT, padx=5)
         self.y_end_entry = tk.Entry(xy_control_frame, width=5)
         self.y_end_entry.pack(side=tk.LEFT, padx=5)
-        #GRID
+
+        # Grid
         self.ax.grid(True)
-        # Left sidebar for controls
+
+        # Sol yan çubuk: Kontroller
         left_frame = tk.Frame(main_frame, bg='#333', width=150)
         left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
 
-        # Graph area (graph_frame) setup (Using previously defined self.fig and self.ax)
-        graph_frame = tk.Frame(main_frame, bg='#1c1c1c')
-        graph_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.canvas = FigureCanvasTkAgg(self.fig, master=graph_frame)
-        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-
-        # Right sidebar for channel selection and terminal
-        right_frame = tk.Frame(main_frame, bg='#333', width=200)
-        right_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=10, pady=10)
-
-        # Port Selection Elements
+        # Port Seçim Elemanları
         port_label = tk.Label(left_frame, text="Select Port", bg='#333', fg='pink', font=("Arial", 14))
         port_label.pack(anchor='w', pady=(10, 5))
 
@@ -102,7 +100,7 @@ class ImportFromSerial:
         self.baudrate_combobox.current(9)
         self.baudrate_combobox.pack(fill=tk.X, pady=(0, 5))
 
-        # Connect Button
+        # Bağlanma Butonu
         connect_button = tk.Button(left_frame, text="Connect", bg='#456', fg='pink', width=8,
                                    command=lambda: self.serial_conn.connect_to_port(
                                        self.port_combobox.get(),
@@ -121,7 +119,7 @@ class ImportFromSerial:
                                           self.root))
         disconnect_button.pack(fill=tk.X, pady=(5, 5))
 
-        # Connection Status Indicator
+        # Bağlantı Durum Göstergesi
         self.connection_status = tk.Label(left_frame, text="Disconnected", bg='#333', fg='red', font=("Arial", 12))
         self.connection_status.pack(pady=(5, 5))
 
@@ -129,21 +127,43 @@ class ImportFromSerial:
         self.indicator_circle = self.connection_indicator.create_oval(2, 2, 18, 18, fill='red')
         self.connection_indicator.pack(pady=(5, 10))
 
-        # Terminal Area (moved below connection info)
+        # Terminal Alanı
         terminal_label = tk.Label(left_frame, text="Terminal:", bg='#333', fg='pink', font=("Arial", 14))
         terminal_label.pack(anchor='w', pady=(10, 5))
 
         self.terminal = ScrolledText(left_frame, wrap=tk.WORD, width=25, height=15, bg='#2A2B45', fg='white', font=("Arial", 10), bd=0, padx=5, pady=5)
         self.terminal.pack(fill=tk.BOTH, expand=True)
 
-        # Setup Channel Controls in the right sidebar using ChannelActivities
+        # Sağ yan çubuk: Kanal seçimleri, ortalama girişi ve butonlar
+        right_frame = tk.Frame(main_frame, bg='#333', width=200)
+        right_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=10, pady=10)
+
+        # Kanal seçim kontrolleri
         self.setup_channel_controls(right_frame)
 
-        # Clear Graph Button at the bottom of the right frame
-        clear_button = tk.Button(right_frame, text="Clear Graph", bg='#555', fg='pink', command=self.clear_graph, height=2)
-        clear_button.pack(side=tk.BOTTOM, pady=10)
+        # Ortalama ve Kalman Filtresi kontrolleri
+        average_label = tk.Label(right_frame, text="Average last N Channels:", bg='#333', fg='pink', font=("Arial", 12))
+        average_label.pack(anchor='w', pady=(10, 5))
 
-        # Average Feature initialization
+        self.average_entry = tk.Entry(right_frame, width=5)
+        self.average_entry.pack(anchor='w', padx=5, pady=(0, 5))
+
+        calculate_average_button = tk.Button(right_frame, text="Calculate Average", bg='#555', fg='pink', command=self.calculate_average)
+        calculate_average_button.pack(anchor='w', pady=(5, 10), fill=tk.X)
+
+        kalman_filter_button = tk.Button(right_frame, text="Toggle Kalman Filter", bg='#555', fg='pink', command=self.toggle_kalman_filter)
+        kalman_filter_button.pack(anchor='w', pady=(5, 10), fill=tk.X)
+
+        clear_button = tk.Button(right_frame, text="Clear Graph", bg='#555', fg='pink', command=self.clear_graph, height=2)
+        clear_button.pack(anchor='w', pady=(5, 10), fill=tk.X)
+
+        # Grafik alanı (graph_frame) ayarları
+        graph_frame = tk.Frame(main_frame, bg='#1c1c1c')
+        graph_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=graph_frame)
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        # Ortalama hesaplama işlevinin başlatılması
         self.average_feature = AverageFeature(
             self.channel_activities,
             self.ax,
@@ -154,45 +174,9 @@ class ImportFromSerial:
             self.canvas
         )
 
-        # Average Calculation Controls
-        average_label = tk.Label(right_frame, text="Average of N Channels:", bg='#333', fg='pink', font=("Arial", 12))
-        average_label.pack(anchor='w', pady=(10, 5))
-        self.average_entry = tk.Entry(right_frame, width=10)
-        self.average_entry.pack(anchor='w', pady=(5, 5))
-
-        calculate_button = tk.Button(right_frame, text="Calculate and Plot", bg='#456', fg='pink',
-                                     command=lambda: self.average_feature.calculate_and_plot_average(
-                                         self.average_entry,
-                                         self.selected_channels,
-                                         self.channel_vars
-                                     ))
-        calculate_button.pack(anchor='w', pady=(5, 10))
-
-        # Kalman Filter Toggle Button
-        kalman_button = tk.Button(right_frame, text="Toggle Kalman Filter", bg='#456', fg='pink',
-                                  command=self.toggle_kalman_filter)
-        kalman_button.pack(anchor='w', pady=(5, 10))
-
-        # Initialize serial port
-        self.serial_conn.refresh_ports(self.port_combobox)
-
-        # Start reading the serial data in real-time
-        self.serial_conn.read_serial_data(self.terminal, self.data_list, self.update_graph, self.root)
-
-        self.root.mainloop()
-
-    def schedule_graph_updates(self):
-        """Schedule periodic updates to the graph to ensure real-time data plotting."""
-        self.update_graph()  # Call the update function
-        self.root.after(1000, self.schedule_graph_updates)  # Schedule next update in 1000 ms (1 second)
-
     def toggle_kalman_filter(self):
         """Toggle the Kalman filter on and off."""
         self.kalman_filter_active = not self.kalman_filter_active
-        if self.kalman_filter_active:
-            print("Kalman filter activated")
-        else:
-            print("Kalman filter deactivated")
         self.update_graph()
 
     def setup_channel_controls(self, parent_frame):
@@ -205,23 +189,20 @@ class ImportFromSerial:
             checkbox.pack(anchor='w', padx=5, pady=2)
             self.channel_entries.append(checkbox)
 
-    # Inside the update_graph method
     def update_graph(self):
-        """Update the graph based on the latest data in real-time."""
+        """Grafiği en son verilerle güncelle."""
         if self.data_list:
-            print("Updating graph...")  # Debugging: Indicate that graph update is triggered
-            self.ax.clear()  # Clear the graph
+            self.ax.clear()  # Grafiği temizle
 
-            # Plot each selected channel's data
+            # Seçilen kanalların verilerini çiz
             self.selected_channels = [i for i, var in enumerate(self.channel_vars) if var.get()]
             if not self.selected_channels:
-                self.selected_channels = [0]  # Default to the first channel if none selected
+                self.selected_channels = [0]  # Hiçbiri seçilmediyse varsayılan olarak ilk kanal
 
             for channel in self.selected_channels:
                 channel_data = [row[channel] for row in self.data_list]
-                print(f"Channel {channel + 1} data: {channel_data[:10]}")  # Debugging: Show first 10 points
                 if self.kalman_filter_active:
-                    # Apply Kalman filter
+                    # Kalman filtresi uygula
                     filtered_data = [self.average_feature.kalman_filter.filter(value) for value in channel_data]
                     self.ax.plot(filtered_data, label=f"Filtered Channel {channel + 1}", linestyle='--')
                 else:
@@ -229,7 +210,7 @@ class ImportFromSerial:
 
             self.ax.legend()
 
-            # Set X and Y axis limits based on user input
+            # Kullanıcı girişi baz alınarak X ve Y eksen limitlerini ayarla
             try:
                 x_start = int(self.x_start_entry.get())
                 x_end = int(self.x_end_entry.get())
@@ -244,54 +225,28 @@ class ImportFromSerial:
             except ValueError:
                 pass
 
-            self.ax.grid(True)  # Ensure the grid is always visible after updating the graph
-            self.canvas.draw()  # Redraw the canvas with the updated graph
-    
-    def plot_selected_channel(self, channel):
-        """Plot the selected channel's data from the file and apply the Kalman filter if active."""
-        try:
-            data = pd.read_csv('channel_data.csv', header=None)
-            channel_data = data.iloc[:, channel].values
+            self.ax.grid(True)  # Grafiği güncelledikten sonra grid'in her zaman görünür olmasını sağla
+            self.canvas.draw()  # Güncellenmiş grafikle kanvası yeniden çiz
 
-            if self.kalman_filter_active:
-                # Apply Kalman filter to the channel data
-                filtered_data = np.array([self.average_feature.kalman_filter.filter(value) for value in channel_data])
-                self.ax.plot(filtered_data, label=f"Filtered Channel {channel + 1}", linestyle='--')
-            else:
-                self.ax.plot(channel_data, label=f"Channel {channel + 1}")
-
-            self.ax.legend()
-
-            # Set X and Y axis limits based on user input
-            try:
-                x_start = int(self.x_start_entry.get())
-                x_end = int(self.x_end_entry.get())
-                self.ax.set_xlim([x_start, x_end])
-            except ValueError:
-                pass
-
-            try:
-                y_start = int(self.y_start_entry.get())
-                y_end = int(self.y_end_entry.get())
-                self.ax.set_ylim([y_start, y_end])
-            except ValueError:
-                pass
-
-        except Exception as e:
-            print(f"Error plotting data: {e}")
-    
-    def test_graph_update(self):
-        # Add test data manually to see if the graph updates correctly
-        self.data_list.append([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]])
-        self.update_graph()
-    
     def clear_graph(self):
         """Grafiği temizle ve veri listesini sıfırla."""
         self.data_list.clear()
+        self.terminal.delete('1.0', tk.END)  # Terminal alanını temizle
         self.ax.clear()
         self.ax.grid(True, color='gray', linestyle='--', linewidth=0.5)
         self.average_feature.average_active = False
         self.canvas.draw()
+
+    def calculate_average(self):
+        try:
+            num_channels = int(self.average_entry.get())
+            if num_channels > 0:
+                selected_channel = self.selected_channels[0] if self.selected_channels else 0
+                self.average_feature.calculate_and_plot_average(
+                    self.average_entry, [selected_channel], self.channel_vars
+                )
+        except ValueError:
+            print("Lütfen geçerli bir sayı girin")
 
 if __name__ == "__main__":
     root = tk.Tk()
